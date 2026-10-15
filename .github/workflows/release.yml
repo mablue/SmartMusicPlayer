@@ -49,19 +49,14 @@ jobs:
       - name: local.properties
         run: echo "sdk.dir=${ANDROID_HOME}" > local.properties
 
-      # =========================================================
-      # KEYSTORE — کاملاً دفاعی
-      # =========================================================
       - name: Create keystore (bulletproof)
         shell: bash
         run: |
-          set +e   # هیچ‌چیزی این مرحله رو متوقف نکنه
-
-          # 1) مسیرها رو از build.gradle(.kts) پروژه استخراج کن
+          set +e
+          # مسیرها رو از build.gradle.kts استخراج کن
           EXTRACTED=""
           for f in app/build.gradle.kts app/build.gradle build.gradle.kts build.gradle; do
             [ -f "$f" ] || continue
-            # هر الگویی مثل: file("../my-upload-key.jks")  یا  file("release.jks")
             HITS=$(grep -oE 'file\([^)]+\.(jks|keystore)[^)]*\)' "$f" 2>/dev/null \
                    | sed -E 's/file\(["'\'']?([^"'\'')]+).*/\1/' \
                    | sed 's#^\.\./##')
@@ -69,7 +64,6 @@ jobs:
           $HITS"
           done
 
-          # 2) لیست پیش‌فرض اسم‌های رایج (توی ریشه و app/)
           DEFAULT="my-upload-key.jks
           release.jks
           release-keystore.jks
@@ -81,7 +75,6 @@ jobs:
           app/upload-keystore.jks
           app/keystore.jks"
 
-          # 3) ترکیب و یکتاسازی
           ALL=$(printf "%s\n%s\n" "$EXTRACTED" "$DEFAULT" \
                 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
                 | sed '/^$/d' | sort -u)
@@ -90,7 +83,6 @@ jobs:
           echo "$ALL"
           echo "─────────────────────"
 
-          # 4) توی هر مسیر بساز
           while IFS= read -r t; do
             [ -z "$t" ] && continue
             DIR=$(dirname "$t")
@@ -104,51 +96,43 @@ jobs:
                 -dname "CN=Android Release,O=Android,C=US" \
                 >/dev/null 2>&1
             fi
-            if [ -f "$t" ]; then
-              echo "✓ $t"
-            else
-              echo "✗ $t (write failed — likely a permissions or path issue)"
-            fi
+            [ -f "$t" ] && echo "✓ $t" || echo "✗ $t"
           done <<EOF
           $ALL
           EOF
 
-          # 5) چاپ نهایی برای دیباگ
-          echo "── final .jks / .keystore on disk ──"
+          echo "── final ──"
           find . -maxdepth 3 \( -name '*.jks' -o -name '*.keystore' \) -not -path './.git/*' | sort
-          echo "────────────────────────────────────"
-
-          # 6) اگه هیچ .jks ای نبود، آخرین تلاش: بساز توی ریشه با اسم قطعی
-          if ! find . -maxdepth 3 -name '*.jks' -not -path './.git/*' | grep -q .; then
-            echo "no keystore found, forcing my-upload-key.jks at repo root"
-            keytool -genkeypair \
-              -keystore my-upload-key.jks \
-              -storepass android -keypass android \
-              -alias androiddebugkey \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Android Release,O=Android,C=US" || true
-            ls -la my-upload-key.jks || true
-          fi
-
-          # 7) مرحله رو موفق کن، حتی اگه چیزی خطا داد
           exit 0
 
       - name: google-services.json
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           if [ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
             echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > app/google-services.json
           elif [ ! -f app/google-services.json ]; then
             printf '{"project_info":{"project_number":"0","project_id":"ci-stub","storage_bucket":"ci-stub.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0000000000000000","android_client_info":{"package_name":"com.aistudio.smartmusic.pkjv"}},"oauth_client":[],"api_key":[{"current_key":"ci-stub-key"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}\n' > app/google-services.json
           fi
-        env:
-          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
 
       - name: .env stub
         run: |
           [ -f .env.example ] || printf 'API_KEY=ci_placeholder\n' > .env.example
           cp .env.example .env
 
+      # =============================================================
+      # اینجا مهمه: env varها رو ست می‌کنیم که Gradle ببینتشون
+      # =============================================================
       - name: assembleRelease
+        env:
+          KEYSTORE_PASSWORD: android
+          KEY_PASSWORD:     android
+          KEY_ALIAS:        androiddebugkey
+          STORE_PASSWORD:   android
+          STORE_FILE:       my-upload-key.jks
+          SIGNING_STORE_PASSWORD: android
+          SIGNING_KEY_PASSWORD:   android
+          SIGNING_KEY_ALIAS:      androiddebugkey
         run: |
           if [ -x ./gradlew ]; then GW=./gradlew; else GW=gradle; fi
           $GW --no-daemon --stacktrace --no-configuration-cache clean assembleRelease
