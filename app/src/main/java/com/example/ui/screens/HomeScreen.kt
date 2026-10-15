@@ -77,7 +77,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.R
 import com.example.data.model.RankTier
 import com.example.data.model.Song
 import com.example.ui.components.AlgorithmInspectorDialog
@@ -130,6 +132,28 @@ fun HomeScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { _ ->
         viewModel.scanDeviceStorage()
+    }
+
+    // System delete launcher for Android 11+ Scoped Storage physical deletion
+    val deleteIntentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            uiState.songToDelete?.let { song ->
+                viewModel.finalizeSongDeletion(song)
+            }
+        } else {
+            viewModel.clearPendingDeleteIntent()
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(uiState.pendingDeleteIntentSender) {
+        val sender = uiState.pendingDeleteIntentSender
+        if (sender != null) {
+            deleteIntentLauncher.launch(
+                androidx.activity.result.IntentSenderRequest.Builder(sender).build()
+            )
+        }
     }
 
     // Back handler to collapse full player if open
@@ -194,7 +218,7 @@ fun HomeScreen(
                                     )
                                 )
                                 Text(
-                                    text = "رتبه‌بندی انطباقی و شافل هوشمند",
+                                    text = stringResource(R.string.app_subtitle),
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         color = NeonCyan,
                                         fontSize = 11.sp
@@ -218,7 +242,7 @@ fun HomeScreen(
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.FolderOpen,
-                                    contentDescription = "اسکن حافظه دستگاه",
+                                    contentDescription = stringResource(R.string.scan_storage_tooltip),
                                     tint = NeonCyan
                                 )
                             }
@@ -231,7 +255,7 @@ fun HomeScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Info,
-                                contentDescription = "راهنمای الگوریتم",
+                                contentDescription = stringResource(R.string.algorithm_info_tooltip),
                                 tint = Color.White.copy(alpha = 0.85f)
                             )
                         }
@@ -270,8 +294,8 @@ fun HomeScreen(
                         NavigationBarItem(
                             selected = uiState.selectedTab == AppTab.LIBRARY,
                             onClick = { viewModel.setSelectedTab(AppTab.LIBRARY) },
-                            icon = { Icon(Icons.Default.LibraryMusic, contentDescription = "کتابخانه") },
-                            label = { Text("کتابخانه", fontSize = 11.sp) },
+                            icon = { Icon(Icons.Default.LibraryMusic, contentDescription = stringResource(R.string.tab_library)) },
+                            label = { Text(stringResource(R.string.tab_library), fontSize = 11.sp) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Color.Black,
                                 indicatorColor = NeonCyan,
@@ -284,8 +308,8 @@ fun HomeScreen(
                         NavigationBarItem(
                             selected = uiState.selectedTab == AppTab.RANKINGS,
                             onClick = { viewModel.setSelectedTab(AppTab.RANKINGS) },
-                            icon = { Icon(Icons.Default.Leaderboard, contentDescription = "رتبه‌بندی") },
-                            label = { Text("رتبه‌بندی", fontSize = 11.sp) },
+                            icon = { Icon(Icons.Default.Leaderboard, contentDescription = stringResource(R.string.tab_rankings)) },
+                            label = { Text(stringResource(R.string.tab_rankings), fontSize = 11.sp) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Color.Black,
                                 indicatorColor = NeonAmber,
@@ -300,7 +324,7 @@ fun HomeScreen(
                             onClick = { viewModel.setSelectedTab(AppTab.DISCOVERY) },
                             icon = {
                                 Box {
-                                    Icon(Icons.Default.Explore, contentDescription = "نشنیده‌ها")
+                                    Icon(Icons.Default.Explore, contentDescription = stringResource(R.string.tab_discovery))
                                     if (unplayedSongs.isNotEmpty()) {
                                         Surface(
                                             shape = CircleShape,
@@ -312,7 +336,7 @@ fun HomeScreen(
                                     }
                                 }
                             },
-                            label = { Text("نشنیده‌ها (${unplayedSongs.size})", fontSize = 11.sp) },
+                            label = { Text("${stringResource(R.string.tab_discovery)} (${unplayedSongs.size})", fontSize = 11.sp) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Color.Black,
                                 indicatorColor = NeonViolet,
@@ -325,8 +349,8 @@ fun HomeScreen(
                         NavigationBarItem(
                             selected = uiState.selectedTab == AppTab.ANALYTICS,
                             onClick = { viewModel.setSelectedTab(AppTab.ANALYTICS) },
-                            icon = { Icon(Icons.Default.AutoAwesome, contentDescription = "آمار") },
-                            label = { Text("تحلیل و آمار", fontSize = 11.sp) },
+                            icon = { Icon(Icons.Default.AutoAwesome, contentDescription = stringResource(R.string.tab_analytics)) },
+                            label = { Text(stringResource(R.string.tab_analytics), fontSize = 11.sp) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Color.Black,
                                 indicatorColor = NeonEmerald,
@@ -372,7 +396,12 @@ fun HomeScreen(
                                 modifier = Modifier.weight(1f)
                             )
                             IconButton(onClick = { viewModel.clearScanMessage() }, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.Clear, contentDescription = "بستن", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    Icons.Default.Clear,
+                                    contentDescription = stringResource(R.string.btn_dismiss),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
                             }
                         }
                     }
@@ -441,15 +470,16 @@ fun HomeScreen(
             onDismissRequest = { viewModel.dismissDeleteDialog() },
             title = {
                 Text(
-                    text = "حذف قطعه از کتابخانه",
+                    text = stringResource(R.string.delete_dialog_title),
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
             },
             text = {
                 Text(
-                    text = "آیا از حذف آهنگ «${song.title}» مطمئن هستید؟ این قطعه از پلی‌لیست و الگوریتم رتبه‌بندی پاک می‌شود.",
-                    color = Color(0xFFCBD5E1)
+                    text = stringResource(R.string.delete_dialog_msg, song.title),
+                    color = Color(0xFFCBD5E1),
+                    lineHeight = 20.sp
                 )
             },
             confirmButton = {
@@ -458,12 +488,12 @@ fun HomeScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = NeonRose),
                     modifier = Modifier.testTag("confirm_delete_button")
                 ) {
-                    Text("حذف شود", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.btn_delete_confirm), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissDeleteDialog() }) {
-                    Text("انصراف", color = Color.White)
+                    Text(stringResource(R.string.btn_cancel), color = Color.White)
                 }
             },
             containerColor = DarkSurface
@@ -482,8 +512,8 @@ fun HomeScreen(
     if (showGeneralInfoDialog) {
         val dummySeedSong = currentSong ?: allSongs.firstOrNull() ?: Song(
             id = 0,
-            title = "نمونه الگوریتم هوشمند",
-            artist = "راهنمای رنک",
+            title = "Smart Algorithm Guide",
+            artist = "Rank Guide",
             isUnplayed = true,
             score = 50.0f
         )
@@ -532,7 +562,7 @@ private fun EmptyLibraryPrompt(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "کتابخانه موسیقی خالی است",
+                    text = stringResource(R.string.empty_library_title),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -542,7 +572,7 @@ private fun EmptyLibraryPrompt(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "آهنگ‌های ذخیره‌شده روی گوشی خود را اسکن کنید. تمام فایل‌ها با امتیاز اولیه ۵۰ ثبت می‌شوند تا شانس شنیده شدن داشته باشند و با رفتار گوش دادن شما رتبه‌بندی شوند.",
+                    text = stringResource(R.string.empty_library_desc),
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = Color(0xFF94A3B8),
                         textAlign = TextAlign.Center,
@@ -565,7 +595,7 @@ private fun EmptyLibraryPrompt(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "اسکن آهنگ‌های گوشی",
+                        text = stringResource(R.string.btn_scan_storage),
                         color = Color.Black,
                         fontWeight = FontWeight.Bold
                     )
@@ -599,12 +629,12 @@ private fun LibraryTabContent(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchChange,
-                placeholder = { Text("جستجوی نام آهنگ، خواننده یا سبک...", fontSize = 13.sp, color = Color(0xFF94A3B8)) },
+                placeholder = { Text(stringResource(R.string.search_hint), fontSize = 13.sp, color = Color(0xFF94A3B8)) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = NeonCyan) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { onSearchChange("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "پاک کردن", tint = Color.White)
+                            Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_clear), tint = Color.White)
                         }
                     }
                 },
@@ -634,7 +664,7 @@ private fun LibraryTabContent(
                 FilterChip(
                     selected = selectedTier == null,
                     onClick = { onTierSelect(null) },
-                    label = { Text("همه (${songs.size})", fontSize = 12.sp) },
+                    label = { Text("${stringResource(R.string.filter_all)} (${songs.size})", fontSize = 12.sp) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = NeonCyan,
                         selectedLabelColor = Color.Black,
@@ -654,7 +684,7 @@ private fun LibraryTabContent(
                 FilterChip(
                     selected = selectedTier == tier,
                     onClick = { onTierSelect(if (selectedTier == tier) null else tier) },
-                    label = { Text(tier.labelFa, fontSize = 12.sp) },
+                    label = { Text(tier.localizedLabel(), fontSize = 12.sp) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = chipColor,
                         selectedLabelColor = Color.Black,
@@ -682,7 +712,7 @@ private fun LibraryTabContent(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "هیچ آهنگی با این فیلتر یافت نشد",
+                        text = stringResource(R.string.no_filtered_songs),
                         style = MaterialTheme.typography.bodyMedium.copy(color = Color(0xFF94A3B8))
                     )
                 }
@@ -690,10 +720,10 @@ private fun LibraryTabContent(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                items(songs, key = { it.id }) { song ->
+                items(songs, key = { it.id }, contentType = { "song" }) { song ->
                     SongListItem(
                         song = song,
                         isCurrentSong = currentSong?.id == song.id,
@@ -722,41 +752,41 @@ private fun RankingsTabContent(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         item {
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
                 border = BorderStroke(1.dp, NeonAmber.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(14.dp),
+                    modifier = Modifier.padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(shape = CircleShape, color = NeonAmber.copy(alpha = 0.2f), modifier = Modifier.size(38.dp)) {
+                    Surface(shape = CircleShape, color = NeonAmber.copy(alpha = 0.2f), modifier = Modifier.size(34.dp)) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Star, contentDescription = null, tint = NeonAmber, modifier = Modifier.size(22.dp))
+                            Icon(Icons.Default.Star, contentDescription = null, tint = NeonAmber, modifier = Modifier.size(20.dp))
                         }
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "لیدربورد محبوبیت آهنگ‌ها",
+                            text = stringResource(R.string.rankings_header_title),
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = Color.White)
                         )
                         Text(
-                            text = "مرتب شده بر اساس رتبه هوشمند و رفتار گوش دادن شما",
-                            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF94A3B8))
+                            text = stringResource(R.string.rankings_header_desc),
+                            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF94A3B8), fontSize = 11.sp)
                         )
                     }
                 }
             }
         }
 
-        itemsIndexed(rankedSongs, key = { _, s -> s.id }) { index, song ->
+        itemsIndexed(rankedSongs, key = { _, s -> s.id }, contentType = { _, _ -> "song" }) { index, song ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -773,19 +803,19 @@ private fun RankingsTabContent(
                     shape = CircleShape,
                     color = rankBadgeColor.copy(alpha = 0.18f),
                     border = BorderStroke(1.dp, rankBadgeColor),
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(28.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = "#$rankNumber",
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = rankBadgeColor
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
                 Box(modifier = Modifier.weight(1f)) {
                     SongListItem(
@@ -801,7 +831,7 @@ private fun RankingsTabContent(
         }
 
         item {
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -817,41 +847,41 @@ private fun DiscoveryTabContent(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         item {
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
                 border = BorderStroke(1.dp, NeonViolet.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(shape = CircleShape, color = NeonViolet.copy(alpha = 0.2f), modifier = Modifier.size(38.dp)) {
+                        Surface(shape = CircleShape, color = NeonViolet.copy(alpha = 0.2f), modifier = Modifier.size(34.dp)) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Explore, contentDescription = null, tint = NeonViolet, modifier = Modifier.size(22.dp))
+                                Icon(Icons.Default.Explore, contentDescription = null, tint = NeonViolet, modifier = Modifier.size(20.dp))
                             }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "صف اکتشاف آهنگ‌های نشنیده",
+                                text = stringResource(R.string.discovery_header_title),
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = Color.White)
                             )
                             Text(
-                                text = "امتیاز شانس ۵۰ | آماده برای ارزیابی اولین پخش",
-                                style = MaterialTheme.typography.bodySmall.copy(color = NeonViolet)
+                                text = stringResource(R.string.discovery_header_desc),
+                                style = MaterialTheme.typography.bodySmall.copy(color = NeonViolet, fontSize = 11.sp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = "این قطعات هنوز هیچ بار گوش داده نشده‌اند و با ۵۰ امتیاز در صف شافل قرار دارند تا شانس شنیده شدن داشته باشند. با اولین پخش، امتیاز ۵۰ ریست می‌شود!",
-                        style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFCBD5E1), lineHeight = 18.sp)
+                        text = stringResource(R.string.discovery_header_info),
+                        style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFCBD5E1), fontSize = 11.sp, lineHeight = 16.sp)
                     )
                 }
             }
@@ -862,25 +892,25 @@ private fun DiscoveryTabContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(40.dp),
+                        .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(48.dp))
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(40.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "تبریک! تمام قطعات کتابخانه را حداقل یکبار شنیده‌اید.",
+                            text = stringResource(R.string.all_songs_discovered_title),
                             style = MaterialTheme.typography.bodyMedium.copy(color = Color.White, fontWeight = FontWeight.Bold)
                         )
                         Text(
-                            text = "همه آهنگ‌ها بر اساس سلیقه و رفتار واقعی‌تان رتبه‌بندی شده‌اند.",
-                            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF94A3B8))
+                            text = stringResource(R.string.all_songs_discovered_desc),
+                            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF94A3B8), fontSize = 11.sp)
                         )
                     }
                 }
             }
         } else {
-            items(unplayedSongs, key = { it.id }) { song ->
+            items(unplayedSongs, key = { it.id }, contentType = { "song" }) { song ->
                 SongListItem(
                     song = song,
                     isCurrentSong = currentSong?.id == song.id,
@@ -893,7 +923,7 @@ private fun DiscoveryTabContent(
         }
 
         item {
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

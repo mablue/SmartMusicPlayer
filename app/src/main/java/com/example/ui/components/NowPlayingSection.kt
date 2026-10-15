@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -32,8 +34,6 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -66,7 +67,6 @@ import com.example.data.model.RankTier
 import com.example.data.model.Song
 import com.example.engine.PlaybackMode
 import com.example.ui.theme.DarkBackground
-import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceBorder
 import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.ElectricBlue
@@ -114,27 +114,37 @@ fun FullPlayerContent(
         modifier = modifier
             .fillMaxSize()
             .background(DarkBackground)
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Top Bar: Minimize handle / button, Title, Info, Delete
+        // Generous vertical spacing prevents overlapping notification bar & notch
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onCollapse, modifier = Modifier.size(40.dp)) {
+            IconButton(
+                onClick = onCollapse,
+                modifier = Modifier
+                    .size(44.dp)
+                    .testTag("full_player_collapse")
+            ) {
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = "کوچک کردن پلیر",
+                    contentDescription = stringResource(R.string.btn_collapse),
                     tint = Color.White,
                     modifier = Modifier.size(32.dp)
                 )
             }
 
             Text(
-                text = "صفحه پخش موسیقی",
+                text = stringResource(R.string.now_playing_title),
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -145,20 +155,27 @@ fun FullPlayerContent(
                 if (song != null) {
                     IconButton(
                         onClick = { onDeleteClick(song) },
-                        modifier = Modifier.size(38.dp)
+                        modifier = Modifier
+                            .size(44.dp)
+                            .testTag("full_player_delete")
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,
-                            contentDescription = "حذف آهنگ",
+                            contentDescription = stringResource(R.string.action_delete_song),
                             tint = NeonRose
                         )
                     }
                 }
 
-                IconButton(onClick = onInfoClick, modifier = Modifier.size(38.dp)) {
+                IconButton(
+                    onClick = onInfoClick,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .testTag("full_player_info")
+                ) {
                     Icon(
                         imageVector = Icons.Default.Info,
-                        contentDescription = "فرمول رتبه",
+                        contentDescription = stringResource(R.string.action_rank_details),
                         tint = Color.White.copy(alpha = 0.85f)
                     )
                 }
@@ -182,7 +199,7 @@ fun FullPlayerContent(
         ) {
             Image(
                 painter = painterResource(id = R.drawable.default_album_art_1792079403842),
-                contentDescription = "کاور آلبوم",
+                contentDescription = stringResource(R.string.now_playing_title),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize()
             )
@@ -202,7 +219,7 @@ fun FullPlayerContent(
 
         // Song Title, Artist, and Rank Badge
         Text(
-            text = song?.title ?: "آهنگی در حال پخش نیست",
+            text = song?.title ?: stringResource(R.string.no_song_playing),
             style = MaterialTheme.typography.titleLarge.copy(
                 fontWeight = FontWeight.Bold,
                 color = Color.White
@@ -214,7 +231,7 @@ fun FullPlayerContent(
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = song?.artist ?: "یک قطعه را برای پخش انتخاب کنید",
+            text = song?.artist ?: stringResource(R.string.select_song_prompt),
             style = MaterialTheme.typography.bodyMedium.copy(
                 color = Color(0xFF94A3B8)
             ),
@@ -235,8 +252,14 @@ fun FullPlayerContent(
                     color = tierColor.copy(alpha = 0.2f),
                     border = BorderStroke(1.dp, tierColor)
                 ) {
+                    val tierLabel = song.rankTier.localizedLabel()
+                    val badgeText = if (song.isUnplayed) {
+                        stringResource(R.string.tier_unplayed_badge)
+                    } else {
+                        "${song.score.toInt()} pts • $tierLabel"
+                    }
                     Text(
-                        text = if (song.isUnplayed) "امتیاز شانس اولیه: ۵۰" else "امتیاز: ${song.score.toInt()}/100 • ${song.rankTier.labelFa}",
+                        text = badgeText,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = tierColor,
@@ -325,7 +348,7 @@ fun FullPlayerContent(
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
-                        text = playbackMode.labelFa,
+                        text = stringResource(playbackMode.stringRes),
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -343,7 +366,7 @@ fun FullPlayerContent(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = mode.labelFa,
+                                text = stringResource(mode.stringRes),
                                 color = if (mode == playbackMode) NeonCyan else Color.White,
                                 fontWeight = if (mode == playbackMode) FontWeight.Bold else FontWeight.Normal
                             )
@@ -371,7 +394,7 @@ fun FullPlayerContent(
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipPrevious,
-                    contentDescription = "قبلی",
+                    contentDescription = stringResource(R.string.action_previous),
                     tint = Color.White,
                     modifier = Modifier.size(36.dp)
                 )
@@ -390,7 +413,7 @@ fun FullPlayerContent(
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "توقف" else "پخش",
+                        contentDescription = if (isPlaying) stringResource(R.string.action_pause) else stringResource(R.string.action_play),
                         tint = Color.Black,
                         modifier = Modifier.size(40.dp)
                     )
@@ -406,7 +429,7 @@ fun FullPlayerContent(
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipNext,
-                    contentDescription = "بعدی",
+                    contentDescription = stringResource(R.string.action_next),
                     tint = Color.White,
                     modifier = Modifier.size(36.dp)
                 )
@@ -424,7 +447,7 @@ fun FullPlayerContent(
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    text = "⚡ آزمایش زنده رفتار الگوریتم:",
+                    text = stringResource(R.string.live_test_title),
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = Color(0xFFCBD5E1),
                         fontWeight = FontWeight.Bold
@@ -445,7 +468,11 @@ fun FullPlayerContent(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("اسکیپ سریع (-۲۰)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = stringResource(R.string.test_quick_skip),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     FilledTonalButton(
@@ -457,7 +484,11 @@ fun FullPlayerContent(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("شنیدن ۵۰٪ (+۵)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = stringResource(R.string.test_moderate),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     FilledTonalButton(
@@ -469,7 +500,11 @@ fun FullPlayerContent(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("پخش کامل (+۲۰)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = stringResource(R.string.test_full_play),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

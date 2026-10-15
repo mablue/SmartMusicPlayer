@@ -118,7 +118,10 @@ fun EvaluationBanner(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = "تحلیل الگوریتم: ${evaluation.songTitle}",
+                                text = androidx.compose.ui.res.stringResource(
+                                    com.example.R.string.eval_analysis_title,
+                                    evaluation.songTitle
+                                ),
                                 style = MaterialTheme.typography.labelLarge.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -131,7 +134,10 @@ fun EvaluationBanner(
                                 color = accentColor
                             ) {
                                 Text(
-                                    text = "$deltaText امتیاز",
+                                    text = androidx.compose.ui.res.stringResource(
+                                        com.example.R.string.eval_score_points,
+                                        deltaText
+                                    ),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.Black,
@@ -143,7 +149,7 @@ fun EvaluationBanner(
                         Spacer(modifier = Modifier.height(2.dp))
 
                         Text(
-                            text = evaluation.reasonFa,
+                            text = evaluation.localizedReason(),
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = Color(0xFFE2E8F0),
                                 fontSize = 12.sp
@@ -153,7 +159,11 @@ fun EvaluationBanner(
                         Spacer(modifier = Modifier.height(4.dp))
 
                         Text(
-                            text = "امتیاز قبلی: ${evaluation.oldScore.toInt()} ➔ امتیاز جدید: ${evaluation.newScore.toInt()}/100",
+                            text = androidx.compose.ui.res.stringResource(
+                                com.example.R.string.eval_score_transition,
+                                evaluation.oldScore.toInt(),
+                                evaluation.newScore.toInt()
+                            ),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = accentColor,
                                 fontWeight = FontWeight.SemiBold
@@ -164,7 +174,7 @@ fun EvaluationBanner(
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "بستن",
+                            contentDescription = androidx.compose.ui.res.stringResource(com.example.R.string.btn_dismiss),
                             tint = Color.White.copy(alpha = 0.7f),
                             modifier = Modifier.size(18.dp)
                         )

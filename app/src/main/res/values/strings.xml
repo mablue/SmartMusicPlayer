@@ -1,3 +1,122 @@
 <resources>
     <string name="app_name">SmartMusic</string>
+    <string name="app_subtitle">Adaptive Ranking &amp; Smart Shuffle</string>
+
+    <!-- Navigation Tabs -->
+    <string name="tab_library">Library</string>
+    <string name="tab_rankings">Rankings</string>
+    <string name="tab_discovery">Discovery</string>
+    <string name="tab_analytics">Analytics</string>
+
+    <!-- Search & Filter -->
+    <string name="search_hint">Search title, artist, or album…</string>
+    <string name="filter_all">All</string>
+    <string name="no_filtered_songs">No songs found matching this filter</string>
+
+    <!-- Tiers -->
+    <string name="tier_diamond">Diamond (80+)</string>
+    <string name="tier_gold">Gold (65–79)</string>
+    <string name="tier_unplayed">Unplayed (50)</string>
+    <string name="tier_silver">Neutral (45–64)</string>
+    <string name="tier_disliked">Disliked (&lt;45)</string>
+    <string name="tier_unplayed_badge">Unplayed: 50</string>
+    <string name="tier_rank_badge">%d pts</string>
+
+    <!-- Stats & Counters -->
+    <string name="full_plays_count">%d full plays</string>
+    <string name="skips_count">%d skips</string>
+    <string name="song_deleted_msg">Song \"%s\" deleted from storage and playlist</string>
+
+    <!-- Actions & Common Buttons -->
+    <string name="scan_storage_tooltip">Scan Device Storage</string>
+    <string name="algorithm_info_tooltip">Algorithm Guide</string>
+    <string name="empty_library_title">Music Library is Empty</string>
+    <string name="empty_library_desc">Scan music files stored on your device. Every song enters with an exploration score of 50 and dynamically adapts to your listening habits.</string>
+    <string name="btn_scan_storage">Scan Device Audio</string>
+    <string name="btn_dismiss">Dismiss</string>
+    <string name="action_play">Play</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_next">Next</string>
+    <string name="action_previous">Previous</string>
+    <string name="action_delete_song">Delete song</string>
+    <string name="action_rank_details">Rank details</string>
+    <string name="action_open_full_player">Open full player</string>
+    <string name="action_clear">Clear</string>
+    <string name="times_format">%d times</string>
+
+    <!-- Deletion Dialog -->
+    <string name="delete_dialog_title">Delete Song from Device</string>
+    <string name="delete_dialog_msg">Are you sure you want to permanently delete \"%s\" from your device storage?\n\nThe audio file will be deleted permanently and playback will continue with the next song.</string>
+    <string name="btn_delete_confirm">Delete from Storage</string>
+    <string name="btn_cancel">Cancel</string>
+
+    <!-- Playback Screen -->
+    <string name="now_playing_title">Now Playing</string>
+    <string name="no_song_playing">No Song Playing</string>
+    <string name="select_song_prompt">Select a song from library to play</string>
+    <string name="btn_collapse">Minimize Player</string>
+    <string name="live_test_title">⚡ Live Algorithm Testing:</string>
+    <string name="test_quick_skip">Quick Skip (-20)</string>
+    <string name="test_moderate">Listen 50% (+5)</string>
+    <string name="test_full_play">Full Play (+20)</string>
+
+    <!-- Playback Modes -->
+    <string name="mode_smart_shuffle">Smart Weighted Shuffle</string>
+    <string name="mode_ranked_first">Top Ranked First</string>
+    <string name="mode_discovery">Discovery (Unplayed First)</string>
+    <string name="mode_sequential">Sequential</string>
+    <string name="mode_repeat_one">Repeat One</string>
+
+    <!-- Leaderboard / Discovery Headers -->
+    <string name="rankings_header_title">Music Popularity Leaderboard</string>
+    <string name="rankings_header_desc">Sorted dynamically by your personalized listening affinity</string>
+    <string name="discovery_header_title">Unplayed Discovery Queue</string>
+    <string name="discovery_header_desc">Initial score 50 | Ready for first listen evaluation</string>
+    <string name="discovery_header_info">These songs have not been played yet and hold a default score of 50 to ensure exploration. On first listen, the score resets to your true preference!</string>
+    <string name="all_songs_discovered_title">All songs have been played at least once!</string>
+    <string name="all_songs_discovered_desc">Every track is now dynamically ranked by your genuine listening behavior.</string>
+
+    <!-- Analytics Tab -->
+    <string name="analytics_title">Smart Algorithm Dashboard</string>
+    <string name="analytics_subtitle">Real-time evaluation of listening behavior, skip rates, and playback weight</string>
+    <string name="stat_total_tracks">Total Tracks</string>
+    <string name="stat_avg_score">Average Score</string>
+    <string name="stat_full_plays">Completed Plays</string>
+    <string name="stat_early_skips">Early Skips</string>
+    <string name="tier_breakdown_title">Score Distribution:</string>
+    <string name="formula_title">Ranking &amp; Selection Formula:</string>
+    <string name="formula_desc">1. Unplayed tracks: Enter with 50 points to guarantee a fair chance in smart shuffle.\n2. First impression: The 50 placeholder resets immediately. Skipping before 20s resets score to 20 (Disliked); listening through resets to 80 (Gold affinity).\n3. Subsequent plays: Early skip subtracts 20 points; full play adds +20 points.\n4. Fatigue protection: Skips within 8 minutes of recent play bypass penalty to prevent false dislikes.\n5. Weighted Shuffle: Selection probability is proportional to (Score)^1.3.</string>
+    <string name="btn_reset_all">Reset All Scores to Default (50 pts)</string>
+    <string name="reset_dialog_title">Reset Scores</string>
+    <string name="reset_dialog_msg">Are you sure you want to reset all song ranks? All tracks will return to unplayed status with 50 exploration score.</string>
+    <string name="btn_reset_confirm">Yes, Reset All</string>
+
+    <!-- Evaluation Banner -->
+    <string name="eval_analysis_title">Algorithm Evaluation: %1$s</string>
+    <string name="eval_score_points">%1$s pts</string>
+    <string name="eval_score_transition">Previous: %1$d ➔ New: %2$d/100</string>
+
+    <!-- Scan Results -->
+    <string name="scan_result_added_and_skipped">%1$d new songs added with initial score 50 (%2$d duplicates skipped)</string>
+    <string name="scan_result_added">%1$d new songs added to library with exploration score 50</string>
+    <string name="scan_result_all_duplicates">All %1$d songs were already in the library, no duplicates added</string>
+    <string name="scan_result_none_found">No audio files found on device storage</string>
+    <string name="scan_result_ranks_reset">All song ranks reset to unplayed (50 exploration score)</string>
+
+    <!-- Algorithm Inspector Dialog -->
+    <string name="inspector_title">Song Rank Analysis</string>
+    <string name="inspector_btn_close">Understood</string>
+    <string name="metric_rank_score">Rank Score</string>
+    <string name="metric_status">Interaction Status</string>
+    <string name="metric_unplayed_val">Unplayed</string>
+    <string name="metric_played_val">Played</string>
+    <string name="metric_unplayed_sub">Initial 50 pts</string>
+    <string name="metric_played_sub">Behavior-based</string>
+    <string name="metric_full_play">Completed</string>
+    <string name="metric_full_play_sub">Positive signal (+20)</string>
+    <string name="metric_early_skip">Early Skip</string>
+    <string name="metric_early_skip_sub">Negative signal (-20)</string>
+    <string name="inspector_info_title">💡 How the algorithm works:</string>
+    <string name="inspector_unplayed_expl">This track has not been played yet and holds a default score of 50. On your first listen, the 50 score will reset to your actual listening duration.</string>
+    <string name="inspector_played_expl">This track has been played before. Listening above 75% grants +20 points and boosts shuffle priority. Quick skips below 20s penalize -20 points (protected against recent plays).</string>
 </resources>

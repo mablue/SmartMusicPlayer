@@ -1,18 +1,32 @@
 package com.example.data.model
 
-enum class RankTier(val labelFa: String, val labelEn: String, val colorHex: String) {
-    DIAMOND("الماس / محبوب‌ترین", "Diamond Favorite", "#38BDF8"),
-    GOLD("عالی و طلایی", "Gold Loved", "#F59E0B"),
-    UNPLAYED("نشنیده / شانس اولیه", "Unplayed Discovery", "#A78BFA"),
-    SILVER("معمولی / خنثی", "Neutral", "#9CA3AF"),
-    DISLIKED("اسکیپ شده / کم‌علاقه", "Frequently Skipped", "#F43F5E")
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Immutable
+import com.example.R
+import java.util.Locale
+
+enum class RankTier(
+    @StringRes val labelRes: Int,
+    val labelEn: String,
+    val labelFa: String,
+    val colorHex: String
+) {
+    DIAMOND(R.string.tier_diamond, "Diamond Favorite", "الماس / محبوب‌ترین", "#38BDF8"),
+    GOLD(R.string.tier_gold, "Gold Loved", "عالی و طلایی", "#F59E0B"),
+    UNPLAYED(R.string.tier_unplayed, "Unplayed Discovery", "نشنیده / شانس اولیه", "#A78BFA"),
+    SILVER(R.string.tier_silver, "Neutral", "معمولی / خنثی", "#9CA3AF"),
+    DISLIKED(R.string.tier_disliked, "Frequently Skipped", "اسکیپ شده / کم‌علاقه", "#F43F5E");
+
+    fun localizedLabel(isFa: Boolean = Locale.getDefault().language == "fa"): String =
+        if (isFa) labelFa else labelEn
 }
 
+@Immutable
 data class Song(
     val id: Long = 0,
     val title: String,
     val artist: String,
-    val album: String = "آلبوم هوشمند",
+    val album: String = "Album",
     val durationMs: Long = 180000L,
     val uri: String = "",
     val isUnplayed: Boolean = true,
@@ -22,7 +36,7 @@ data class Song(
     val lastListenRatio: Float = 0.0f,
     val lastPlayedTimestamp: Long = 0L,
     val colorHex: String = "#8B5CF6",
-    val genre: String = "الکترونیک"
+    val genre: String = "Music"
 ) {
     val rankTier: RankTier
         get() = when {
@@ -53,4 +67,7 @@ data class SessionEvaluation(
     val isPositive: Boolean,
     val listenedRatio: Float,
     val wasUnplayed: Boolean
-)
+) {
+    fun localizedReason(isFa: Boolean = Locale.getDefault().language == "fa"): String =
+        if (isFa) reasonFa else reasonEn
+}

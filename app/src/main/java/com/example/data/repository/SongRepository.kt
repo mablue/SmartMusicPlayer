@@ -48,6 +48,59 @@ class SongRepository(
         songDao.deleteSong(songId)
     }
 
+    /**
+     * Physically deletes the audio file from device storage and removes it from the database.
+     */
+    suspend fun deleteSongFileAndDb(song: Song): Boolean = withContext(Dispatchers.IO) {
+        var fileDeleted = false
+        try {
+            if (song.uri.isNotEmpty()) {
+                val uri = android.net.Uri.parse(song.uri)
+                if (uri.scheme == "content") {
+                    try {
+                        val rows = context.contentResolver.delete(uri, null, null)
+                        fileDeleted = (rows > 0)
+                    } catch (sec: SecurityException) {
+                        android.util.Log.w("SongRepository", "SecurityException on direct delete: ${sec.message}")
+                    }
+                } else {
+                    val filePath = if (uri.scheme == "file") uri.path ?: song.uri else song.uri
+                    val file = java.io.File(filePath)
+                    if (file.exists()) {
+                        fileDeleted = file.delete()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SongRepository", "Error deleting physical audio file", e)
+        }
+
+        // Delete from Room database
+        songDao.deleteSong(song.id)
+        fileDeleted
+    }
+
+    /**
+     * On Android 11+ (API 30+), MediaStore requires system consent dialog for deleting
+     * external media files owned by other apps.
+     */
+    fun getDeletePendingIntent(song: Song): android.app.PendingIntent? {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            val uri = android.net.Uri.parse(song.uri)
+            if (uri.scheme == "content") {
+                return try {
+                    android.provider.MediaStore.createDeleteRequest(
+                        context.contentResolver,
+                        listOf(uri)
+                    )
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }
+        return null
+    }
+
     suspend fun resetAllRanks() = withContext(Dispatchers.IO) {
         songDao.resetAllRanks()
     }
@@ -108,9 +161,9 @@ class SongRepository(
 
                 while (it.moveToNext()) {
                     val mediaId = it.getLong(idCol)
-                    val title = it.getString(titleCol)?.trim() ?: "قطعه نامشخص"
-                    val artist = it.getString(artistCol)?.trim() ?: "خواننده نامشخص"
-                    val album = it.getString(albumCol)?.trim() ?: "آلبوم"
+                    val title = it.getString(titleCol)?.trim() ?: "Unknown Track"
+                    val artist = it.getString(artistCol)?.trim() ?: "Unknown Artist"
+                    val album = it.getString(albumCol)?.trim() ?: "Album"
                     val duration = it.getLong(durationCol)
 
                     // Ignore very short audio files (notification pings under 10 seconds)

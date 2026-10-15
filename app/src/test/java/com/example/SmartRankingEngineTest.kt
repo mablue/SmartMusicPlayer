@@ -90,6 +90,33 @@ class SmartRankingEngineTest {
     }
 
     @Test
+    fun playedSong_recentPlay_earlySkip_doesNotPenalize() {
+        val playedSong = Song(
+            id = 5,
+            title = "Recently Heard Song",
+            artist = "Artist",
+            durationMs = 180_000L,
+            isUnplayed = false,
+            score = 75.0f,
+            playCount = 2,
+            skipCount = 0,
+            lastPlayedTimestamp = System.currentTimeMillis() - (60 * 1000L) // 1 minute ago
+        )
+
+        // User skips after 5 seconds because they just heard it
+        val (updatedSong, evaluation) = SmartRankingEngine.evaluateSession(
+            song = playedSong,
+            listenedMs = 5_000L,
+            totalMs = 180_000L,
+            isManualSkip = true
+        )
+
+        assertEquals("Score should NOT decrease when skipped shortly after playing", 75.0f, updatedSong.score, 0.01f)
+        assertEquals("Skip count should not increase for fatigue skip", 0, updatedSong.skipCount)
+        assertTrue(evaluation.reasonFa.contains("خستگی"))
+    }
+
+    @Test
     fun playedSong_consecutiveReplay_givesBonus() {
         val playedSong = Song(
             id = 4,

@@ -105,7 +105,7 @@ fun AlgorithmInspectorDialog(
                         }
 
                         Text(
-                            text = "تحلیل رنک آهنگ",
+                            text = androidx.compose.ui.res.stringResource(com.example.R.string.inspector_title),
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -116,7 +116,7 @@ fun AlgorithmInspectorDialog(
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "بستن",
+                            contentDescription = androidx.compose.ui.res.stringResource(com.example.R.string.btn_dismiss),
                             tint = Color.White.copy(alpha = 0.7f)
                         )
                     }
@@ -147,17 +147,25 @@ fun AlgorithmInspectorDialog(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     MetricBox(
-                        title = "امتیاز رتبه",
+                        title = androidx.compose.ui.res.stringResource(com.example.R.string.metric_rank_score),
                         value = "${song.score.toInt()}/100",
-                        subtitle = song.rankTier.labelFa,
+                        subtitle = song.rankTier.localizedLabel(),
                         color = tierColor,
                         modifier = Modifier.weight(1f)
                     )
 
                     MetricBox(
-                        title = "وضعیت تعامل",
-                        value = if (song.isUnplayed) "نشنیده" else "شنیده شده",
-                        subtitle = if (song.isUnplayed) "امتیاز شانس ۵۰" else "بر پایه رفتار",
+                        title = androidx.compose.ui.res.stringResource(com.example.R.string.metric_status),
+                        value = if (song.isUnplayed) {
+                            androidx.compose.ui.res.stringResource(com.example.R.string.metric_unplayed_val)
+                        } else {
+                            androidx.compose.ui.res.stringResource(com.example.R.string.metric_played_val)
+                        },
+                        subtitle = if (song.isUnplayed) {
+                            androidx.compose.ui.res.stringResource(com.example.R.string.metric_unplayed_sub)
+                        } else {
+                            androidx.compose.ui.res.stringResource(com.example.R.string.metric_played_sub)
+                        },
                         color = if (song.isUnplayed) NeonViolet else NeonCyan,
                         modifier = Modifier.weight(1f)
                     )
@@ -170,17 +178,17 @@ fun AlgorithmInspectorDialog(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     MetricBox(
-                        title = "تکمیل پخش",
-                        value = "${song.playCount} بار",
-                        subtitle = "سیگنال مثبت (+۲۰)",
+                        title = androidx.compose.ui.res.stringResource(com.example.R.string.metric_full_play),
+                        value = androidx.compose.ui.res.stringResource(com.example.R.string.times_format, song.playCount),
+                        subtitle = androidx.compose.ui.res.stringResource(com.example.R.string.metric_full_play_sub),
                         color = NeonEmerald,
                         modifier = Modifier.weight(1f)
                     )
 
                     MetricBox(
-                        title = "اسکیپ سریع",
-                        value = "${song.skipCount} بار",
-                        subtitle = "سیگنال منفی (-۲۰)",
+                        title = androidx.compose.ui.res.stringResource(com.example.R.string.metric_early_skip),
+                        value = androidx.compose.ui.res.stringResource(com.example.R.string.times_format, song.skipCount),
+                        subtitle = androidx.compose.ui.res.stringResource(com.example.R.string.metric_early_skip_sub),
                         color = NeonRose,
                         modifier = Modifier.weight(1f)
                     )
@@ -196,7 +204,7 @@ fun AlgorithmInspectorDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "💡 چگونگی کارکرد الگوریتم:",
+                            text = androidx.compose.ui.res.stringResource(com.example.R.string.inspector_info_title),
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = NeonCyan
@@ -204,9 +212,9 @@ fun AlgorithmInspectorDialog(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         val explanation = if (song.isUnplayed) {
-                            "این قطعه هنوز پخش نشده و با امتیاز پایه ۵۰ نگهداری می‌شود تا شانس شنیده شدن داشته باشد. با اولین گوش دادن، امتیاز ۵۰ ریست شده و بر اساس میزان علاقه واقعی شما جایگزین خواهد شد."
+                            androidx.compose.ui.res.stringResource(com.example.R.string.inspector_unplayed_expl)
                         } else {
-                            "این قطعه قبلاً پخش شده است. هر پخش بالای ۷۵٪ باعث کسب ۲۰ امتیاز و اولویت بالاتر در شافل هوشمند می‌شود. اسکیپ زیر ۲۰ ثانیه موجب ۲۰ امتیاز جریمه و کاهش شانس انتخاب مجدد می‌گردد."
+                            androidx.compose.ui.res.stringResource(com.example.R.string.inspector_played_expl)
                         }
                         Text(
                             text = explanation,
@@ -226,7 +234,11 @@ fun AlgorithmInspectorDialog(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(text = "متوجه شدم", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = androidx.compose.ui.res.stringResource(com.example.R.string.inspector_btn_close),
+                        color = Color.Black,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }

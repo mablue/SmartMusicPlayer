@@ -106,7 +106,7 @@ fun MiniPlayerBar(
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.default_album_art_1792079403842),
-                        contentDescription = "کاور",
+                        contentDescription = androidx.compose.ui.res.stringResource(com.example.R.string.now_playing_title),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.matchParentSize()
                     )
@@ -152,7 +152,11 @@ fun MiniPlayerBar(
                             border = BorderStroke(0.5.dp, tierColor)
                         ) {
                             Text(
-                                text = if (song.isUnplayed) "نشنیده: ۵۰" else "${song.score.toInt()} رنک",
+                                text = if (song.isUnplayed) {
+                                    androidx.compose.ui.res.stringResource(com.example.R.string.tier_unplayed_badge)
+                                } else {
+                                    androidx.compose.ui.res.stringResource(com.example.R.string.tier_rank_badge, song.score.toInt())
+                                },
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = tierColor,
@@ -186,7 +190,11 @@ fun MiniPlayerBar(
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "توقف" else "پخش",
+                        contentDescription = if (isPlaying) {
+                            androidx.compose.ui.res.stringResource(com.example.R.string.action_pause)
+                        } else {
+                            androidx.compose.ui.res.stringResource(com.example.R.string.action_play)
+                        },
                         tint = Color.Black,
                         modifier = Modifier.size(22.dp)
                     )
@@ -201,7 +209,7 @@ fun MiniPlayerBar(
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
-                        contentDescription = "بعدی / اسکیپ",
+                        contentDescription = androidx.compose.ui.res.stringResource(com.example.R.string.action_next),
                         tint = Color.White,
                         modifier = Modifier.size(26.dp)
                     )
@@ -214,7 +222,7 @@ fun MiniPlayerBar(
                 ) {
                     Icon(
                         imageVector = Icons.Default.OpenInFull,
-                        contentDescription = "صفحه کامل پخش",
+                        contentDescription = androidx.compose.ui.res.stringResource(com.example.R.string.action_open_full_player),
                         tint = Color(0xFF94A3B8),
                         modifier = Modifier.size(16.dp)
                     )

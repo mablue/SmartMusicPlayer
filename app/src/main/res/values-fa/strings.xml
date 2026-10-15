@@ -1,0 +1,122 @@
+<resources>
+    <string name="app_name">SmartMusic</string>
+    <string name="app_subtitle">رتبه‌بندی انطباقی و شافل هوشمند</string>
+
+    <!-- Navigation Tabs -->
+    <string name="tab_library">کتابخانه</string>
+    <string name="tab_rankings">رتبه‌بندی</string>
+    <string name="tab_discovery">نشنیده‌ها</string>
+    <string name="tab_analytics">تحلیل و آمار</string>
+
+    <!-- Search & Filter -->
+    <string name="search_hint">جستجوی نام آهنگ، خواننده یا سبک…</string>
+    <string name="filter_all">همه</string>
+    <string name="no_filtered_songs">هیچ آهنگی با این فیلتر یافت نشد</string>
+
+    <!-- Tiers -->
+    <string name="tier_diamond">الماس و محبوب (۸۰+)</string>
+    <string name="tier_gold">طلایی (۶۵–۷۹)</string>
+    <string name="tier_unplayed">نشنیده (۵۰)</string>
+    <string name="tier_silver">معمولی (۴۵–۶۴)</string>
+    <string name="tier_disliked">اسکیپ‌شده (&lt;۴۵)</string>
+    <string name="tier_unplayed_badge">نشنیده: ۵۰</string>
+    <string name="tier_rank_badge">%d رنک</string>
+
+    <!-- Stats & Counters -->
+    <string name="full_plays_count">%d پخش کامل</string>
+    <string name="skips_count">%d اسکیپ</string>
+    <string name="song_deleted_msg">قطعه «%s» از حافظه گوشی و لیست حذف شد</string>
+
+    <!-- Actions & Common Buttons -->
+    <string name="scan_storage_tooltip">اسکن حافظه دستگاه</string>
+    <string name="algorithm_info_tooltip">راهنمای الگوریتم</string>
+    <string name="empty_library_title">کتابخانه موسیقی خالی است</string>
+    <string name="empty_library_desc">آهنگ‌های ذخیره‌شده روی گوشی خود را اسکن کنید. تمام فایل‌ها با امتیاز اولیه ۵۰ ثبت می‌شوند تا شانس شنیده شدن داشته باشند و با رفتار گوش دادن شما رتبه‌بندی شوند.</string>
+    <string name="btn_scan_storage">اسکن آهنگ‌های گوشی</string>
+    <string name="btn_dismiss">بستن</string>
+    <string name="action_play">پخش</string>
+    <string name="action_pause">توقف</string>
+    <string name="action_next">بعدی</string>
+    <string name="action_previous">قبلی</string>
+    <string name="action_delete_song">حذف آهنگ</string>
+    <string name="action_rank_details">جزئیات رنک</string>
+    <string name="action_open_full_player">صفحه کامل پخش</string>
+    <string name="action_clear">پاک کردن</string>
+    <string name="times_format">%d بار</string>
+
+    <!-- Deletion Dialog -->
+    <string name="delete_dialog_title">حذف فایل از حافظه گوشی</string>
+    <string name="delete_dialog_msg">آیا مطمئن هستید که می‌خواهید آهنگ «%s» را از حافظه دستگاه پاک کنید؟\n\nفایل صوتی این قطعه به صورت دائمی از حافظه گوشی حذف می‌شود و پخش به آهنگ بعدی منتقل خواهد شد.</string>
+    <string name="btn_delete_confirm">حذف از حافظه گوشی</string>
+    <string name="btn_cancel">انصراف</string>
+
+    <!-- Playback Screen -->
+    <string name="now_playing_title">صفحه پخش موسیقی</string>
+    <string name="no_song_playing">آهنگی در حال پخش نیست</string>
+    <string name="select_song_prompt">یک قطعه را برای پخش انتخاب کنید</string>
+    <string name="btn_collapse">کوچک کردن پلیر</string>
+    <string name="live_test_title">⚡ آزمایش زنده رفتار الگوریتم:</string>
+    <string name="test_quick_skip">اسکیپ سریع (-۲۰)</string>
+    <string name="test_moderate">شنیدن ۵۰٪ (+۵)</string>
+    <string name="test_full_play">پخش کامل (+۲۰)</string>
+
+    <!-- Playback Modes -->
+    <string name="mode_smart_shuffle">شافل هوشمند (وزن‌دار)</string>
+    <string name="mode_ranked_first">برترین‌ها به ترتیب رتبه</string>
+    <string name="mode_discovery">صف اکتشاف (اول نشنیده‌ها)</string>
+    <string name="mode_sequential">پخش عادی ترتیبی</string>
+    <string name="mode_repeat_one">تکرار همین آهنگ</string>
+
+    <!-- Leaderboard / Discovery Headers -->
+    <string name="rankings_header_title">لیدربورد محبوبیت آهنگ‌ها</string>
+    <string name="rankings_header_desc">مرتب شده بر اساس رتبه هوشمند و رفتار شنیداری شما</string>
+    <string name="discovery_header_title">صف اکتشاف آهنگ‌های نشنیده</string>
+    <string name="discovery_header_desc">امتیاز شانس ۵۰ | آماده برای ارزیابی اولین پخش</string>
+    <string name="discovery_header_info">این قطعات هنوز شنیده نشده‌اند و با ۵۰ امتیاز در صف شافل قرار دارند تا شانس پخش داشته باشند. با اولین گوش دادن، امتیاز ۵۰ ریست می‌شود!</string>
+    <string name="all_songs_discovered_title">تمام قطعات کتابخانه حداقل یکبار شنیده شده‌اند.</string>
+    <string name="all_songs_discovered_desc">همه آهنگ‌ها بر اساس سلیقه و رفتار واقعی‌تان رتبه‌بندی شده‌اند.</string>
+
+    <!-- Analytics Tab -->
+    <string name="analytics_title">داشبورد تحلیلی الگوریتم هوشمند</string>
+    <string name="analytics_subtitle">ارزیابی زنده رفتار گوش دادن، نرخ اسکیپ و شانس پخش</string>
+    <string name="stat_total_tracks">کل قطعات</string>
+    <string name="stat_avg_score">میانگین رتبه</string>
+    <string name="stat_full_plays">تکمیل پخش</string>
+    <string name="stat_early_skips">اسکیپ زودهنگام</string>
+    <string name="tier_breakdown_title">دسته‌بندی آهنگ‌ها بر اساس رتبه:</string>
+    <string name="formula_title">فرمول انتخاب و امتیازدهی:</string>
+    <string name="formula_desc">۱. آهنگ‌های نشنیده: با ۵۰ امتیاز وارد می‌شوند تا در شافل شانس داشته باشند.\n۲. اولین پخش: بلافاصله امتیاز ۵۰ ریست می‌شود. اسکیپ زیر ۲۰ ثانیه امتیاز را به ۲۰ تنزل می‌دهد و پخش کامل به ۸۰ ارتقا می‌دهد.\n۳. پخش‌های بعدی: اسکیپ ۲۰- کسر و پخش کامل ۲۰+ اضافه می‌کند.\n۴. محافظت خستگی: اسکیپ در کمتر از ۸ دقیقه پس از پخش نمره منفی ندارد.\n۵. شافل وزنی: احتمال انتخاب متناسب با (امتیاز)^۱.۳ است.</string>
+    <string name="btn_reset_all">ریست تمام امتیازات به حالت اولیه (۵۰ امتیاز نشنیده)</string>
+    <string name="reset_dialog_title">ریست امتیازات</string>
+    <string name="reset_dialog_msg">آیا مطمئن هستید که می‌خواهید رتبه و آمار تمام آهنگ‌ها را ریست کنید؟ تمام قطعات مجدداً به عنوان نشنیده با امتیاز اولیه ۵۰ ثبت خواهند شد.</string>
+    <string name="btn_reset_confirm">بله، ریست شود</string>
+
+    <!-- Evaluation Banner -->
+    <string name="eval_analysis_title">تحلیل الگوریتم: %1$s</string>
+    <string name="eval_score_points">%1$s امتیاز</string>
+    <string name="eval_score_transition">امتیاز قبلی: %1$d ➔ امتیاز جدید: %2$d/100</string>
+
+    <!-- Scan Results -->
+    <string name="scan_result_added_and_skipped">%1$d آهنگ جدید با امتیاز اولیه ۵۰ افزوده شد (%2$d آهنگ تکراری نادیده گرفته شد)</string>
+    <string name="scan_result_added">%1$d آهنگ جدید با امتیاز شانس اولیه (۵۰) به کتابخانه اضافه شد</string>
+    <string name="scan_result_all_duplicates">همه %1$d آهنگ قبلاً در کتابخانه وجود داشتند و تکراری افزوده نشدند</string>
+    <string name="scan_result_none_found">هیچ فایل صوتی در حافظه دستگاه یافت نشد</string>
+    <string name="scan_result_ranks_reset">تمام رتبه‌ها به حالت اولیه نشنیده (۵۰ امتیاز) بازنشانی شدند</string>
+
+    <!-- Algorithm Inspector Dialog -->
+    <string name="inspector_title">تحلیل رنک آهنگ</string>
+    <string name="inspector_btn_close">متوجه شدم</string>
+    <string name="metric_rank_score">امتیاز رتبه</string>
+    <string name="metric_status">وضعیت تعامل</string>
+    <string name="metric_unplayed_val">نشنیده</string>
+    <string name="metric_played_val">شنیده شده</string>
+    <string name="metric_unplayed_sub">امتیاز شانس ۵۰</string>
+    <string name="metric_played_sub">بر پایه رفتار</string>
+    <string name="metric_full_play">تکمیل پخش</string>
+    <string name="metric_full_play_sub">سیگنال مثبت (+۲۰)</string>
+    <string name="metric_early_skip">اسکیپ سریع</string>
+    <string name="metric_early_skip_sub">سیگنال منفی (-۲۰)</string>
+    <string name="inspector_info_title">💡 چگونگی کارکرد الگوریتم:</string>
+    <string name="inspector_unplayed_expl">این قطعه هنوز شنیده نشده و با امتیاز پایه ۵۰ نگهداری می‌شود. با اولین گوش دادن، امتیاز ۵۰ ریست شده و بر اساس میزان علاقه واقعی شما جایگزین خواهد شد.</string>
+    <string name="inspector_played_expl">این قطعه قبلاً پخش شده است. هر پخش بالای ۷۵٪ باعث کسب ۲۰ امتیاز و اولویت بالاتر در شافل می‌شود. اسکیپ زیر ۲۰ ثانیه موجب ۲۰ امتیاز جریمه می‌گردد (محافظت‌شده در برابر پخش‌های اخیر).</string>
+</resources>

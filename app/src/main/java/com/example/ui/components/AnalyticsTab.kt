@@ -17,11 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Equalizer
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.TrendingDown
@@ -46,10 +42,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.model.RankTier
+import com.example.R
 import com.example.data.model.Song
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceBorder
@@ -89,14 +86,14 @@ fun AnalyticsTab(
         item {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "داشبورد تحلیلی الگوریتم هوشمند",
+                text = stringResource(R.string.analytics_title),
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
             )
             Text(
-                text = "ارزیابی زنده رفتار گوش دادن، نرخ اسکیپ و شانس پخش",
+                text = stringResource(R.string.analytics_subtitle),
                 style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF94A3B8))
             )
         }
@@ -108,7 +105,7 @@ fun AnalyticsTab(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 StatCard(
-                    title = "کل قطعات",
+                    title = stringResource(R.string.stat_total_tracks),
                     value = "$totalSongs",
                     icon = Icons.Default.Headphones,
                     color = NeonCyan,
@@ -116,7 +113,7 @@ fun AnalyticsTab(
                 )
 
                 StatCard(
-                    title = "میانگین رتبه",
+                    title = stringResource(R.string.stat_avg_score),
                     value = "${avgScore.toInt()}/100",
                     icon = Icons.Default.Equalizer,
                     color = NeonAmber,
@@ -131,16 +128,16 @@ fun AnalyticsTab(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 StatCard(
-                    title = "تکمیل پخش",
-                    value = "$totalPlays بار",
+                    title = stringResource(R.string.stat_full_plays),
+                    value = stringResource(R.string.times_format, totalPlays),
                     icon = Icons.Default.TrendingUp,
                     color = NeonEmerald,
                     modifier = Modifier.weight(1f)
                 )
 
                 StatCard(
-                    title = "اسکیپ زودهنگام",
-                    value = "$totalSkips بار",
+                    title = stringResource(R.string.stat_early_skips),
+                    value = stringResource(R.string.times_format, totalSkips),
                     icon = Icons.Default.TrendingDown,
                     color = NeonRose,
                     modifier = Modifier.weight(1f)
@@ -158,7 +155,7 @@ fun AnalyticsTab(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "دسته‌بندی آهنگ‌ها بر اساس رتبه:",
+                        text = stringResource(R.string.tier_breakdown_title),
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -167,11 +164,11 @@ fun AnalyticsTab(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    TierProgressRow("الماس و محبوب (۸۰+)", diamondCount, totalSongs, ElectricBlue)
-                    TierProgressRow("طلایی و مطلوب (۶۵ - ۷۹)", goldCount, totalSongs, NeonAmber)
-                    TierProgressRow("نشنیده‌ها (امتیاز پایه ۵۰)", unplayedCount, totalSongs, NeonViolet)
-                    TierProgressRow("معمولی / خنثی (۴۵ - ۶۴)", neutralCount, totalSongs, Color(0xFF94A3B8))
-                    TierProgressRow("اسکیپ‌شده / کم‌علاقه (< ۴۵)", dislikedCount, totalSongs, NeonRose)
+                    TierProgressRow(stringResource(R.string.tier_diamond), diamondCount, totalSongs, ElectricBlue)
+                    TierProgressRow(stringResource(R.string.tier_gold), goldCount, totalSongs, NeonAmber)
+                    TierProgressRow(stringResource(R.string.tier_unplayed), unplayedCount, totalSongs, NeonViolet)
+                    TierProgressRow(stringResource(R.string.tier_silver), neutralCount, totalSongs, Color(0xFF94A3B8))
+                    TierProgressRow(stringResource(R.string.tier_disliked), dislikedCount, totalSongs, NeonRose)
                 }
             }
         }
@@ -196,7 +193,7 @@ fun AnalyticsTab(
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "فرمول انتخاب و امتیازدهی:",
+                            text = stringResource(R.string.formula_title),
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = NeonCyan
@@ -207,10 +204,7 @@ fun AnalyticsTab(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "۱. آهنگ‌های نشنیده: با ۵۰ امتیاز وارد سیستم می‌شوند تا در شافل فرصت پخش داشته باشند.\n" +
-                                "۲. اولین پخش: بلافاصله امتیاز پیش‌فرض ریست می‌شود؛ اگر زیر ۲۰ ثانیه اسکیپ کنید، امتیاز به ۲۰ تنزل می‌یابد؛ اگر کامل گوش دهید به ۸۰ ارتقا می‌یابد.\n" +
-                                "۳. پخش‌های بعدی: اسکیپ ۲۰- امتیاز کسر می‌کند و پخش کامل ۲۰+ امتیاز می‌افزاید.\n" +
-                                "۴. شافل هوشمند وزنی: شانس انتخاب هر آهنگ متناسب با (امتیاز)^۱.۳ است؛ بنابراین آهنگ محبوب با امتیاز ۹۰ شانس بسیار بیشتری نسبت به آهنگ اسکیپ‌شده با امتیاز ۵ دارد.",
+                        text = stringResource(R.string.formula_desc),
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = Color(0xFFE2E8F0),
                             lineHeight = 20.sp
@@ -232,10 +226,11 @@ fun AnalyticsTab(
                     .padding(vertical = 8.dp)
             ) {
                 Icon(imageVector = Icons.Default.RestartAlt, contentDescription = null)
+                Spacer(modifier = Modifier.size(8.dp))
                 Text(
-                    text = "ریست تمام امتیازات به حالت اولیه (۵۰ امتیاز نشنیده)",
+                    text = stringResource(R.string.btn_reset_all),
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 8.dp)
+                    modifier = Modifier.padding(horizontal = 4.dp)
                 )
             }
         }
@@ -249,11 +244,15 @@ fun AnalyticsTab(
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
             title = {
-                Text(text = "ریست امتیازات", fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    text = stringResource(R.string.reset_dialog_title),
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
             },
             text = {
                 Text(
-                    text = "آیا مطمئن هستید که می‌خواهید رتبه و آمار تمام آهنگ‌ها را ریست کنید؟ تمام قطعات مجدداً به عنوان نشنیده با امتیاز اولیه ۵۰ ثبت خواهند شد.",
+                    text = stringResource(R.string.reset_dialog_msg),
                     color = Color(0xFFCBD5E1)
                 )
             },
@@ -265,12 +264,19 @@ fun AnalyticsTab(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = NeonRose)
                 ) {
-                    Text("بله، ریست شود", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = stringResource(R.string.btn_reset_confirm),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showResetDialog = false }) {
-                    Text("انصراف", color = Color.White)
+                    Text(
+                        text = stringResource(R.string.btn_cancel),
+                        color = Color.White
+                    )
                 }
             },
             containerColor = DarkSurface
@@ -298,17 +304,33 @@ private fun StatCard(
         ) {
             Surface(
                 shape = CircleShape,
-                color = color.copy(alpha = 0.18f),
-                modifier = Modifier.size(40.dp)
+                color = color.copy(alpha = 0.15f),
+                modifier = Modifier.size(38.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
+
             Spacer(modifier = Modifier.size(10.dp))
+
             Column {
-                Text(text = title, style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF94A3B8)))
-                Text(text = value, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF94A3B8))
+                )
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                )
             }
         }
     }
@@ -316,27 +338,40 @@ private fun StatCard(
 
 @Composable
 private fun TierProgressRow(
-    title: String,
+    tierLabel: String,
     count: Int,
     total: Int,
     color: Color
 ) {
-    val fraction = if (total > 0) count.toFloat() / total.toFloat() else 0f
+    val fraction = if (total > 0) (count.toFloat() / total.toFloat()).coerceIn(0f, 1f) else 0f
+    val percent = (fraction * 100).toInt()
 
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = title, style = MaterialTheme.typography.bodySmall.copy(color = Color.White))
-            Text(text = "$count قطعه", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = color))
+            Text(
+                text = tierLabel,
+                fontSize = 12.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = "$count ($percent%)",
+                fontSize = 12.sp,
+                color = color,
+                fontWeight = FontWeight.Bold
+            )
         }
+
         Spacer(modifier = Modifier.height(4.dp))
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(6.dp)
-                .background(Color(0xFF26213B), RoundedCornerShape(3.dp))
+                .background(DarkSurfaceVariant, RoundedCornerShape(3.dp))
         ) {
             Box(
                 modifier = Modifier

@@ -302,11 +302,24 @@ class SmartAudioPlayer(
 
     fun onSongDeleted(deletedSongId: Long) {
         if (_currentSong.value?.id == deletedSongId) {
+            val wasPlaying = _isPlaying.value
+            val playlist = currentPlaylist
+            val currentIndex = playlist.indexOfFirst { it.id == deletedSongId }
             releasePlayer()
             _isPlaying.value = false
             _currentPositionMs.value = 0L
-            val remaining = currentPlaylist.filter { it.id != deletedSongId }
-            _currentSong.value = remaining.firstOrNull()
+
+            val nextSong = if (currentIndex >= 0 && currentIndex < playlist.size - 1) {
+                playlist[currentIndex + 1]
+            } else {
+                val remaining = playlist.filter { it.id != deletedSongId }
+                remaining.firstOrNull()
+            }
+
+            _currentSong.value = nextSong
+            if (nextSong != null && wasPlaying) {
+                playSong(nextSong)
+            }
         }
     }
 

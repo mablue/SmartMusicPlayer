@@ -5,12 +5,20 @@ import com.example.data.model.Song
 import kotlin.math.pow
 import kotlin.random.Random
 
-enum class PlaybackMode(val labelFa: String, val labelEn: String, val iconName: String) {
-    SMART_SHUFFLE("شافل هوشمند (وزن‌دار)", "Smart Weighted Shuffle", "AutoAwesome"),
-    RANKED_FIRST("برترین‌ها به ترتیب رتبه", "Top Ranked First", "TrendingUp"),
-    DISCOVERY("اکتشاف آهنگ‌های نشنیده", "Discovery (Unplayed First)", "Explore"),
-    SEQUENTIAL("پخش عادی ترتیبی", "Sequential", "FormatListNumbered"),
-    REPEAT_ONE("تکرار همین آهنگ", "Repeat One", "RepeatOne")
+enum class PlaybackMode(
+    @androidx.annotation.StringRes val stringRes: Int,
+    val labelEn: String,
+    val labelFa: String,
+    val iconName: String
+) {
+    SMART_SHUFFLE(com.example.R.string.mode_smart_shuffle, "Smart Weighted Shuffle", "شافل هوشمند (وزن‌دار)", "AutoAwesome"),
+    RANKED_FIRST(com.example.R.string.mode_ranked_first, "Top Ranked First", "برترین‌ها به ترتیب رتبه", "TrendingUp"),
+    DISCOVERY(com.example.R.string.mode_discovery, "Discovery (Unplayed First)", "اکتشاف آهنگ‌های نشنیده", "Explore"),
+    SEQUENTIAL(com.example.R.string.mode_sequential, "Sequential", "پخش عادی ترتیبی", "FormatListNumbered"),
+    REPEAT_ONE(com.example.R.string.mode_repeat_one, "Repeat One", "تکرار همین آهنگ", "RepeatOne");
+
+    fun localizedLabel(isFa: Boolean = java.util.Locale.getDefault().language == "fa"): String =
+        if (isFa) labelFa else labelEn
 }
 
 object SmartRankingEngine {
@@ -23,6 +31,10 @@ object SmartRankingEngine {
     const val EARLY_SKIP_MS_THRESHOLD = 20_000L
     const val EARLY_SKIP_RATIO_THRESHOLD = 0.20f
     const val FULL_LISTEN_RATIO_THRESHOLD = 0.75f
+
+    // Listening fatigue protection: if a song was played within the last 8 minutes,
+    // skipping it is treated as natural session fatigue/navigation, NOT dislike!
+    const val RECENT_PLAY_PROTECTION_THRESHOLD_MS = 8 * 60 * 1000L
 
     /**
      * Evaluates user listening session and updates the song's score and statistics.
@@ -41,6 +53,10 @@ object SmartRankingEngine {
 
         val isEarlySkip = isManualSkip && (listenedMs < EARLY_SKIP_MS_THRESHOLD || ratio < EARLY_SKIP_RATIO_THRESHOLD)
         val isFullListen = ratio >= FULL_LISTEN_RATIO_THRESHOLD || (!isManualSkip && ratio >= 0.70f)
+
+        // Check if track was played very recently
+        val isRecentlyPlayed = !wasUnplayed && song.lastPlayedTimestamp > 0 &&
+                (System.currentTimeMillis() - song.lastPlayedTimestamp < RECENT_PLAY_PROTECTION_THRESHOLD_MS)
 
         var newScore: Float
         var newPlayCount = song.playCount
@@ -76,6 +92,13 @@ object SmartRankingEngine {
         } else {
             // Song was already played in the past, adjust existing score incrementally
             when {
+                isEarlySkip && isRecentlyPlayed -> {
+                    // Protected by recency: User recently heard it, skipping is fatigue/navigation, not dislike!
+                    newScore = oldScore
+                    reasonFa = "رد کردن آهنگ تازه شنیده‌شده: کسر امتیاز اعمال نشد (محافظت در برابر خستگی گوش دادن)."
+                    reasonEn = "Skipped recently played track: No penalty applied (fatigue protection)."
+                    isPositive = true
+                }
                 isEarlySkip -> {
                     val penalty = 20.0f
                     newScore = (oldScore - penalty).coerceAtLeast(MIN_SCORE)

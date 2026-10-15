@@ -10,7 +10,7 @@ data class SongEntity(
     val id: Long = 0,
     val title: String,
     val artist: String,
-    val album: String = "آلبوم هوشمند",
+    val album: String = "Album",
     val durationMs: Long = 180000L,
     val uri: String = "",
     val isUnplayed: Boolean = true,
@@ -20,7 +20,7 @@ data class SongEntity(
     val lastListenRatio: Float = 0.0f,
     val lastPlayedTimestamp: Long = 0L,
     val colorHex: String = "#8B5CF6",
-    val genre: String = "الکترونیک"
+    val genre: String = "Music"
 ) {
     fun toSong(): Song = Song(
         id = id,
