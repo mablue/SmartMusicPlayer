@@ -1,1 +1,218 @@
 
+name: Release
+
+on:
+  push:
+    tags: [ 'v*.*.*' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v1.0.0)'
+        required: true
+        type: string
+
+# این خط مهمه: پرمیشن write روی محتوا (برای ساخت release و پوش README)
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # این خط باعث می‌شه بتونیم با توکن پیش‌فرض پوش کنیم
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "ver=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "ver=${GITHUB_REF_NAME}"    >> $GITHUB_OUTPUT
+          fi
+
+      # ============================================================
+      # اگه workflow_dispatch بود و تگ وجود نداشت، خودمون می‌سازیمش
+      # ============================================================
+      - name: Ensure tag exists
+        env:
+          VER: ${{ steps.v.outputs.ver }}
+        run: |
+          set -eu
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git rev-parse "refs/tags/$VER" >/dev/null 2>&1; then
+            git tag "$VER"
+            git push origin "$VER"
+            echo "created tag $VER"
+          else
+            echo "tag $VER already exists"
+          fi
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Write local.properties
+        run: echo "sdk.dir=${ANDROID_HOME}" > local.properties
+
+      - name: Prepare release keystore
+        env:
+          KS_B64:    ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KS_PASS:   ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASS:  ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -eu
+          KS_PATH=""
+          for f in app/build.gradle.kts app/build.gradle; do
+            [ -f "$f" ] || continue
+            KS_PATH=$(grep -oE 'storeFile[[:space:]]*=[[:space:]]*file\([^)]+\)' "$f" \
+                      | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+            [ -n "$KS_PATH" ] && break
+          done
+          [ -z "$KS_PATH" ] && KS_PATH="my-upload-key.jks"
+          case "$KS_PATH" in ../*) KS_PATH="${KS_PATH#../}" ;; esac
+          echo "keystore path: $KS_PATH"
+
+          if [ -n "${KS_B64:-}" ]; then
+            printf '%s' "$KS_B64" | base64 -d > "$KS_PATH"
+            echo "restored keystore from secret"
+          else
+            echo "::warning::RELEASE_KEYSTORE_BASE64 not set — generating throwaway key"
+            keytool -genkeypair -v \
+              -keystore "$KS_PATH" \
+              -storepass "${KS_PASS:-android}" \
+              -keypass   "${KEY_PASS:-android}" \
+              -alias     "${KEY_ALIAS:-androiddebugkey}" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Release,O=Android,C=US"
+          fi
+          ls -la "$KS_PATH"
+
+      - name: Prepare google-services.json
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
+            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > app/google-services.json
+          elif [ ! -f app/google-services.json ]; then
+            printf '{"project_info":{"project_number":"0","project_id":"ci-stub","storage_bucket":"ci-stub.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0000000000000000","android_client_info":{"package_name":"com.aistudio.smartmusic.pkjv"}},"oauth_client":[],"api_key":[{"current_key":"ci-stub-key"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}\n' > app/google-services.json
+          fi
+
+      - name: Prepare .env stub
+        run: |
+          [ -f .env.example ] || printf 'API_KEY=ci_placeholder\n' > .env.example
+          cp .env.example .env
+
+      - name: Gradle assembleRelease
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS:         ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD:      ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -eu
+          : "${KEYSTORE_PASSWORD:=android}"
+          : "${KEY_ALIAS:=androiddebugkey}"
+          : "${KEY_PASSWORD:=android}"
+          export KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD
+          if [ -x ./gradlew ]; then GW=./gradlew; else GW=gradle; fi
+          $GW --no-daemon --stacktrace --no-configuration-cache clean assembleRelease
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p out
+          find . -type f \
+            \( -path '*/build/outputs/apk/*/*.apk' \
+             -o -path '*/build/outputs/bundle/*/*.aab' \) \
+            -exec cp {} out/ \;
+          ls -la out/
+
+      # ============================================================
+      # ساخت / آپدیت Release
+      # ============================================================
+      - name: Create / Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.v.outputs.ver }}
+          name: Release ${{ steps.v.outputs.ver }}
+          generate_release_notes: true
+          files: out/*
+          draft: false
+          prerelease: false
+          make_latest: true
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ============================================================
+      # آپدیت README
+      # ============================================================
+      - name: Update README with latest release
+        env:
+          VER: ${{ steps.v.outputs.ver }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          # بلوک بین این دو مارکر رو جایگزین می‌کنیم
+          START="<!-- LATEST_RELEASE_START -->"
+          END="<!-- LATEST_RELEASE_END -->"
+
+          BODY_BLOCK="${START}
+          ## آخرین نسخه: [${VER}](https://github.com/${REPO}/releases/tag/${VER})
+
+          [![Latest Release](https://img.shields.io/github/v/release/${REPO}?include_prereleases&style=flat-square)](https://github.com/${REPO}/releases/latest)
+          [![Downloads](https://img.shields.io/github/downloads/${REPO}/total?style=flat-square)](https://github.com/${REPO}/releases)
+
+          - فایل‌های نصبی: [صفحه Releases](https://github.com/${REPO}/releases/latest)
+          - ساخته شده به‌صورت خودکار در $(date -u +%Y-%m-%d)
+
+          ${END}"
+
+          touch README.md
+
+          # اگه مارکرها وجود دارن، جایگزین کن
+          if grep -q "$START" README.md && grep -q "$END" README.md; then
+            awk -v start="$START" -v end="$END" -v block="$BODY_BLOCK" '
+              BEGIN { inblk=0 }
+              $0 ~ start { print block; inblk=1; next }
+              $0 ~ end   { inblk=0; next }
+              !inblk     { print }
+            ' README.md > README.md.new
+            mv README.md.new README.md
+          else
+            # مارکر نیست → بالای فایل اضافه کن
+            { echo "$BODY_BLOCK"; echo; cat README.md; } > README.md.new
+            mv README.md.new README.md
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet README.md; then
+            echo "README unchanged"
+          else
+            git add README.md
+            git commit -m "docs: update README for ${VER} [skip ci]"
+            git push origin HEAD:${{ github.event.repository.default_branch }}
+            echo "README updated and pushed"
+          fi
