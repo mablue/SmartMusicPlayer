@@ -1,0 +1,6 @@
+{
+  "name": "SmartMusic Player",
+  "description": "Adaptive Android music player that dynamically ranks songs based on listening duration, skips, and repeats with weighted smart shuffle.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
