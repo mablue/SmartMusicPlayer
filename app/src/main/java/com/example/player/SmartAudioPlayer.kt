@@ -4,11 +4,16 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.example.data.lyrics.LyricLine
+import com.example.data.lyrics.LyricsResult
+import com.example.data.lyrics.LyricsService
 import com.example.data.model.SessionEvaluation
 import com.example.data.model.Song
+import com.example.data.preferences.PlaybackPreferences
 import com.example.data.repository.SongRepository
 import com.example.engine.PlaybackMode
 import com.example.engine.SmartRankingEngine
@@ -29,6 +34,7 @@ class SmartAudioPlayer(
 
     private var mediaPlayer: MediaPlayer? = null
     private val handler = Handler(Looper.getMainLooper())
+    private val prefs = PlaybackPreferences.getInstance(context)
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
@@ -48,6 +54,34 @@ class SmartAudioPlayer(
     private val _lastEvaluation = MutableStateFlow<SessionEvaluation?>(null)
     val lastEvaluation: StateFlow<SessionEvaluation?> = _lastEvaluation.asStateFlow()
 
+    // Lyrics State
+    private val _lyricsResult = MutableStateFlow<LyricsResult?>(null)
+    val lyricsResult: StateFlow<LyricsResult?> = _lyricsResult.asStateFlow()
+
+    private val _isFetchingLyrics = MutableStateFlow(false)
+    val isFetchingLyrics: StateFlow<Boolean> = _isFetchingLyrics.asStateFlow()
+
+    private val _isTranslatingLyrics = MutableStateFlow(false)
+    val isTranslatingLyrics: StateFlow<Boolean> = _isTranslatingLyrics.asStateFlow()
+
+    private val _playbackSpeed = MutableStateFlow(1.0f)
+    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
+
+    private val _sleepTimerMinutes = MutableStateFlow(0)
+    val sleepTimerMinutes: StateFlow<Int> = _sleepTimerMinutes.asStateFlow()
+
+    private var sleepTimerJob: kotlinx.coroutines.Job? = null
+
+    // A-B Repeat Loop State
+    private val _abLoopActive = MutableStateFlow(false)
+    val abLoopActive: StateFlow<Boolean> = _abLoopActive.asStateFlow()
+
+    private val _abLoopStartMs = MutableStateFlow<Long?>(null)
+    val abLoopStartMs: StateFlow<Long?> = _abLoopStartMs.asStateFlow()
+
+    private val _abLoopEndMs = MutableStateFlow<Long?>(null)
+    val abLoopEndMs: StateFlow<Long?> = _abLoopEndMs.asStateFlow()
+
     // Playlist reference for next song selection
     var currentPlaylist: List<Song> = emptyList()
 
@@ -57,35 +91,110 @@ class SmartAudioPlayer(
         override fun run() {
             mediaPlayer?.let { player ->
                 if (player.isPlaying) {
-                    _currentPositionMs.value = player.currentPosition.toLong()
-                    _durationMs.value = player.duration.coerceAtLeast(0).toLong()
+                    val pos = player.currentPosition.toLong()
+                    _currentPositionMs.value = pos
+                    val dur = player.duration.coerceAtLeast(0).toLong()
+                    _durationMs.value = dur
+
+                    // Check A-B Repeat Loop
+                    if (_abLoopActive.value) {
+                        val loopEnd = _abLoopEndMs.value
+                        val loopStart = _abLoopStartMs.value ?: 0L
+                        if (loopEnd != null && pos >= loopEnd) {
+                            player.seekTo(loopStart.toInt())
+                            _currentPositionMs.value = loopStart
+                        }
+                    }
+
+                    // Periodic save of playback position (every 2 seconds)
+                    if (pos % 2000L < 300L) {
+                        prefs.lastPositionMs = pos
+                        _currentSong.value?.let { s ->
+                            prefs.saveSongResumePosition(s.id, pos, dur)
+                        }
+                    }
                 }
             }
-            handler.postDelayed(this, 300)
+            handler.postDelayed(this, 250)
         }
     }
 
     init {
+        instance = this
         handler.post(progressUpdater)
+        restoreSavedMode()
+    }
+
+    private fun restoreSavedMode() {
+        try {
+            val savedMode = PlaybackMode.valueOf(prefs.lastPlaybackMode)
+            _playbackMode.value = savedMode
+        } catch (e: Exception) {
+            _playbackMode.value = PlaybackMode.SMART_SHUFFLE
+        }
+    }
+
+    fun restoreLastSong(playlist: List<Song>) {
+        if (_currentSong.value != null || playlist.isEmpty()) return
+        val savedId = prefs.lastSongId
+        val savedSong = if (savedId > 0) playlist.firstOrNull { it.id == savedId } else null
+        val songToPrepare = savedSong ?: playlist.firstOrNull()
+
+        if (songToPrepare != null) {
+            val resumePos = prefs.getSongResumePosition(songToPrepare.id).let {
+                if (it > 0L) it else prefs.lastPositionMs
+            }.coerceIn(0L, songToPrepare.durationMs)
+
+            _currentSong.value = songToPrepare.copy(resumePositionMs = resumePos)
+            _currentPositionMs.value = resumePos
+            _durationMs.value = songToPrepare.durationMs
+            fetchLyricsForSong(songToPrepare)
+        }
     }
 
     fun setPlaybackMode(mode: PlaybackMode) {
         _playbackMode.value = mode
+        prefs.lastPlaybackMode = mode.name
     }
 
-    fun playSong(song: Song) {
-        // Finalize previous song session if it was playing and changing tracks
+    /**
+     * Plays a song, automatically resuming from its saved position if startAtMs is negative (-1L).
+     * If the user previously completed or skipped near the end, saved position will be 0 (starts from beginning).
+     */
+    fun playSong(song: Song, startAtMs: Long = -1L) {
         val prevSong = _currentSong.value
-        if (prevSong != null && prevSong.id != song.id && _isPlaying.value) {
-            evaluateAndSaveSession(prevSong, _currentPositionMs.value, _durationMs.value, isManualSkip = true)
+        if (prevSong != null && prevSong.id != song.id) {
+            prefs.saveSongResumePosition(prevSong.id, _currentPositionMs.value, _durationMs.value)
+            if (_isPlaying.value) {
+                evaluateAndSaveSession(prevSong, _currentPositionMs.value, _durationMs.value, isManualSkip = true)
+            }
         }
 
         releasePlayer()
 
+        val targetStartMs = if (startAtMs >= 0L) {
+            startAtMs
+        } else {
+            val savedPos = prefs.getSongResumePosition(song.id)
+            if (savedPos > 0L && (song.durationMs <= 0 || savedPos < (song.durationMs * 0.95f).toLong())) {
+                savedPos
+            } else {
+                0L
+            }
+        }
+
         val isConsecutiveReplay = (lastPlayedSongId == song.id)
         lastPlayedSongId = song.id
-        _currentSong.value = song
-        _currentPositionMs.value = 0L
+        _currentSong.value = song.copy(resumePositionMs = targetStartMs)
+        _currentPositionMs.value = targetStartMs
+
+        // Persist active song ID and resume position
+        prefs.lastSongId = song.id
+        prefs.lastPositionMs = targetStartMs
+        prefs.saveSongResumePosition(song.id, targetStartMs, song.durationMs)
+
+        // Trigger automatic lyrics fetch
+        fetchLyricsForSong(song)
 
         try {
             val player = MediaPlayer().apply {
@@ -96,7 +205,6 @@ class SmartAudioPlayer(
                         .build()
                 )
 
-                // Try local file or URI
                 var uriSet = false
                 if (song.uri.isNotEmpty()) {
                     try {
@@ -109,7 +217,7 @@ class SmartAudioPlayer(
                             uriSet = true
                         }
                     } catch (e: Exception) {
-                        Log.w(TAG, "Could not set provided URI, generating fallback WAV", e)
+                        Log.w(TAG, "Could not set provided URI, using procedural fallback", e)
                     }
                 }
 
@@ -123,7 +231,16 @@ class SmartAudioPlayer(
                 }
 
                 prepare()
+                if (startAtMs > 0) {
+                    seekTo(startAtMs.toInt())
+                }
                 start()
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && _playbackSpeed.value != 1.0f) {
+                    try {
+                        playbackParams = playbackParams.setSpeed(_playbackSpeed.value)
+                    } catch (e: Exception) {}
+                }
 
                 setOnCompletionListener {
                     handleTrackCompletion(song, isConsecutiveReplay)
@@ -132,6 +249,7 @@ class SmartAudioPlayer(
                 setOnErrorListener { _, what, extra ->
                     Log.e(TAG, "MediaPlayer error: what=$what, extra=$extra")
                     _isPlaying.value = false
+                    updateNotification()
                     true
                 }
             }
@@ -139,9 +257,11 @@ class SmartAudioPlayer(
             mediaPlayer = player
             _isPlaying.value = true
             _durationMs.value = player.duration.toLong().coerceAtLeast(song.durationMs)
+            updateNotification()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to play song: ${song.title}", e)
             _isPlaying.value = false
+            updateNotification()
         }
     }
 
@@ -150,6 +270,11 @@ class SmartAudioPlayer(
             if (it.isPlaying) {
                 it.pause()
                 _isPlaying.value = false
+                prefs.lastPositionMs = _currentPositionMs.value
+                _currentSong.value?.let { song ->
+                    prefs.saveSongResumePosition(song.id, _currentPositionMs.value, _durationMs.value)
+                }
+                updateNotification()
             }
         }
     }
@@ -159,9 +284,10 @@ class SmartAudioPlayer(
             if (!it.isPlaying) {
                 it.start()
                 _isPlaying.value = true
+                updateNotification()
             }
         } ?: run {
-            _currentSong.value?.let { playSong(it) }
+            _currentSong.value?.let { playSong(it, _currentPositionMs.value) }
         }
     }
 
@@ -172,11 +298,70 @@ class SmartAudioPlayer(
     fun seekTo(positionMs: Long) {
         mediaPlayer?.seekTo(positionMs.toInt())
         _currentPositionMs.value = positionMs
+        prefs.lastPositionMs = positionMs
+        _currentSong.value?.let { song ->
+            prefs.saveSongResumePosition(song.id, positionMs, _durationMs.value)
+        }
     }
 
-    /**
-     * Skip to next song. Evaluates skip behavior (e.g. quick skip = negative score).
-     */
+    fun seekRelative(deltaMs: Long) {
+        val maxDuration = _durationMs.value.coerceAtLeast(1000L)
+        val target = (_currentPositionMs.value + deltaMs).coerceIn(0L, maxDuration)
+        seekTo(target)
+    }
+
+    fun setABLoopStart() {
+        _abLoopStartMs.value = _currentPositionMs.value
+        if (_abLoopEndMs.value != null && _abLoopEndMs.value!! <= _currentPositionMs.value) {
+            _abLoopEndMs.value = null
+            _abLoopActive.value = false
+        }
+    }
+
+    fun setABLoopEnd() {
+        val start = _abLoopStartMs.value ?: 0L
+        if (_currentPositionMs.value > start) {
+            _abLoopEndMs.value = _currentPositionMs.value
+            _abLoopActive.value = true
+            seekTo(start)
+        }
+    }
+
+    fun clearABLoop() {
+        _abLoopActive.value = false
+        _abLoopStartMs.value = null
+        _abLoopEndMs.value = null
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        _playbackSpeed.value = speed
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                mediaPlayer?.let { player ->
+                    player.playbackParams = player.playbackParams.setSpeed(speed)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not set playback speed", e)
+        }
+    }
+
+    fun setSleepTimer(minutes: Int) {
+        sleepTimerJob?.cancel()
+        _sleepTimerMinutes.value = minutes
+        if (minutes <= 0) return
+
+        sleepTimerJob = coroutineScope.launch {
+            var remaining = minutes
+            while (remaining > 0) {
+                kotlinx.coroutines.delay(60_000L)
+                remaining--
+                _sleepTimerMinutes.value = remaining
+            }
+            pause()
+        }
+    }
+
     fun skipNext(isManual: Boolean = true) {
         val song = _currentSong.value
         val listenedMs = _currentPositionMs.value
@@ -184,6 +369,7 @@ class SmartAudioPlayer(
 
         if (song != null) {
             evaluateAndSaveSession(song, listenedMs, totalMs, isManualSkip = isManual)
+            prefs.saveSongResumePosition(song.id, listenedMs, totalMs)
         }
 
         val nextSong = SmartRankingEngine.selectNextSong(
@@ -197,9 +383,6 @@ class SmartAudioPlayer(
         }
     }
 
-    /**
-     * Previous track or restart current.
-     */
     fun skipPrevious() {
         if (_currentPositionMs.value > 4000L) {
             seekTo(0)
@@ -214,9 +397,6 @@ class SmartAudioPlayer(
         }
     }
 
-    /**
-     * Simulates a listen session for quick algorithm verification without waiting.
-     */
     fun simulateSession(ratio: Float, isManualSkip: Boolean) {
         val song = _currentSong.value ?: return
         val total = _durationMs.value.coerceAtLeast(song.durationMs)
@@ -229,7 +409,6 @@ class SmartAudioPlayer(
             isManualSkip = isManualSkip
         )
 
-        // Select and play next song
         val nextSong = SmartRankingEngine.selectNextSong(
             playlist = currentPlaylist,
             currentSongId = song.id,
@@ -246,7 +425,6 @@ class SmartAudioPlayer(
         _isPlaying.value = false
         val total = _durationMs.value.coerceAtLeast(song.durationMs)
 
-        // Track completed 100%: Big positive reward!
         evaluateAndSaveSession(
             song = song,
             listenedMs = total,
@@ -254,6 +432,9 @@ class SmartAudioPlayer(
             isManualSkip = false,
             isConsecutiveReplay = isConsecutiveReplay
         )
+
+        // Reset resume position to 0 since user finished listening to the whole track!
+        prefs.saveSongResumePosition(song.id, 0L, song.durationMs)
 
         if (_playbackMode.value == PlaybackMode.REPEAT_ONE) {
             playSong(song)
@@ -288,6 +469,43 @@ class SmartAudioPlayer(
         coroutineScope.launch(Dispatchers.IO) {
             repository.updateSong(updatedSong)
         }
+        updateNotification()
+    }
+
+    fun fetchLyricsForSong(song: Song) {
+        coroutineScope.launch(Dispatchers.IO) {
+            _isFetchingLyrics.value = true
+            val lyrics = LyricsService.fetchLyrics(
+                artist = song.artist,
+                title = song.title,
+                durationSec = song.durationMs / 1000
+            )
+            _lyricsResult.value = lyrics
+            _isFetchingLyrics.value = false
+
+            // Auto-translate if enabled in preferences
+            if (lyrics != null && prefs.isLyricsTranslationEnabled) {
+                translateCurrentLyrics(prefs.targetTranslationLanguage)
+            }
+        }
+    }
+
+    fun translateCurrentLyrics(targetLang: String) {
+        val current = _lyricsResult.value ?: return
+        coroutineScope.launch(Dispatchers.IO) {
+            _isTranslatingLyrics.value = true
+            val translatedLines = current.lines.map { line ->
+                val translated = LyricsService.translateText(line.text, targetLang)
+                line.copy(translatedText = translated)
+            }
+            _lyricsResult.value = current.copy(lines = translatedLines)
+            _isTranslatingLyrics.value = false
+        }
+    }
+
+    private fun updateNotification() {
+        val song = _currentSong.value
+        MediaPlaybackService.updateNotification(context, song, _isPlaying.value)
     }
 
     private fun releasePlayer() {
@@ -317,8 +535,14 @@ class SmartAudioPlayer(
             }
 
             _currentSong.value = nextSong
-            if (nextSong != null && wasPlaying) {
-                playSong(nextSong)
+            if (nextSong != null) {
+                prefs.lastSongId = nextSong.id
+                prefs.lastPositionMs = 0L
+                if (wasPlaying) {
+                    playSong(nextSong)
+                }
+            } else {
+                MediaPlaybackService.stopNotification(context)
             }
         }
     }
@@ -326,5 +550,12 @@ class SmartAudioPlayer(
     fun release() {
         handler.removeCallbacks(progressUpdater)
         releasePlayer()
+        MediaPlaybackService.stopNotification(context)
+        instance = null
+    }
+
+    companion object {
+        @Volatile
+        var instance: SmartAudioPlayer? = null
     }
 }

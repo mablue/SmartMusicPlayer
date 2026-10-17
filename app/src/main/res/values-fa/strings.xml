@@ -119,4 +119,37 @@
     <string name="inspector_info_title">💡 چگونگی کارکرد الگوریتم:</string>
     <string name="inspector_unplayed_expl">این قطعه هنوز شنیده نشده و با امتیاز پایه ۵۰ نگهداری می‌شود. با اولین گوش دادن، امتیاز ۵۰ ریست شده و بر اساس میزان علاقه واقعی شما جایگزین خواهد شد.</string>
     <string name="inspector_played_expl">این قطعه قبلاً پخش شده است. هر پخش بالای ۷۵٪ باعث کسب ۲۰ امتیاز و اولویت بالاتر در شافل می‌شود. اسکیپ زیر ۲۰ ثانیه موجب ۲۰ امتیاز جریمه می‌گردد (محافظت‌شده در برابر پخش‌های اخیر).</string>
+    <!-- Lyrics and Translation HUD -->
+    <string name="lyrics_dialog_title">متن زنده و همگام آهنگ</string>
+    <string name="lyrics_loading">در حال جستجوی متن و لیریکس در پایگاه جهانی…</string>
+    <string name="lyrics_not_found">متنی برای این قطعه در پایگاه آنلاین یافت نشد</string>
+    <string name="lyrics_retry">تلاش مجدد</string>
+    <string name="lyrics_synced_hud">⚡ هاد همگام</string>
+    <string name="lyrics_plain_text">متن ساده</string>
+    <string name="lyrics_translation_active">ترجمه فعال</string>
+    <string name="lyrics_translation_toggle">ترجمه</string>
+    <string name="action_lyrics">متن زنده</string>
+    <string name="bluetooth_autoplay_active">پخش خودکار بلوتوث: فعال</string>
+    <string name="bluetooth_autoplay_inactive">پخش خودکار بلوتوث: غیرفعال</string>
+    <string name="meta_genre">ژانر: %s</string>
+    <string name="meta_lang">زبان: %s</string>
+    <string name="meta_folder">پوشه: %s</string>
+    <string name="meta_size">%1$.1f مگابایت</string>
+    <string name="speed_label">سرعت: %1$.2f برابر</string>
+    <string name="sleep_timer_off">تایمر خواب: خاموش</string>
+    <string name="action_forward_10">+۱۰ ثانیه</string>
+    <string name="action_rewind_10">-۱۰ ثانیه</string>
+    <string name="action_forward_15">+۱۵ ثانیه</string>
+    <string name="action_rewind_15">-۱۵ ثانیه</string>
+    <string name="action_restart_beginning">پخش مجدد از ابتدا</string>
+    <string name="resume_badge">⏱️ %s</string>
+    <string name="car_mode_title">حالت رانندگی و خودرو</string>
+    <string name="car_mode_exit">خروج از حالت خودرو</string>
+    <string name="car_mode_speed">سرعت</string>
+    <string name="car_mode_auto_launch">حالت خودروی خودکار</string>
+    <string name="ab_loop_title">تکرار بازه‌ای A-B</string>
+    <string name="ab_loop_set_a">نقطه A</string>
+    <string name="ab_loop_set_b">نقطه B</string>
+    <string name="ab_loop_clear">حذف تکرار</string>
+    <string name="ab_loop_active">تکرار: %1$s ➜ %2$s</string>
 </resources>

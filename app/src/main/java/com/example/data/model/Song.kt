@@ -36,8 +36,27 @@ data class Song(
     val lastListenRatio: Float = 0.0f,
     val lastPlayedTimestamp: Long = 0L,
     val colorHex: String = "#8B5CF6",
-    val genre: String = "Music"
+    val genre: String = "Music",
+    val folderName: String = "Music",
+    val fileSizeBytes: Long = 0L,
+    val bitrateKbps: Int = 320,
+    val mimeType: String = "audio/mpeg",
+    val detectedLanguage: String = "Auto",
+    val lyrics: String = "",
+    val syncedLyrics: String = "",
+    val resumePositionMs: Long = 0L
 ) {
+    val hasResumePosition: Boolean
+        get() = resumePositionMs > 5000L && (durationMs <= 0 || resumePositionMs < (durationMs * 0.95f).toLong())
+
+    val formattedResumePosition: String
+        get() {
+            val totalSeconds = (resumePositionMs / 1000).coerceAtLeast(0)
+            val minutes = totalSeconds / 60
+            val seconds = totalSeconds % 60
+            return "%02d:%02d".format(minutes, seconds)
+        }
+
     val rankTier: RankTier
         get() = when {
             isUnplayed -> RankTier.UNPLAYED
@@ -54,6 +73,16 @@ data class Song(
             val seconds = totalSeconds % 60
             return "%02d:%02d".format(minutes, seconds)
         }
+
+    val formattedFileSize: String
+        get() {
+            if (fileSizeBytes <= 0L) return "3.5 MB"
+            val mb = fileSizeBytes.toDouble() / (1024.0 * 1024.0)
+            return if (mb >= 1.0) "%.1f MB".format(mb) else "%d KB".format(fileSizeBytes / 1024)
+        }
+
+    val formattedBitrate: String
+        get() = if (bitrateKbps > 0) "$bitrateKbps kbps" else "320 kbps HQ"
 }
 
 data class SessionEvaluation(

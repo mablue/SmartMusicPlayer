@@ -119,4 +119,37 @@
     <string name="inspector_info_title">💡 How the algorithm works:</string>
     <string name="inspector_unplayed_expl">This track has not been played yet and holds a default score of 50. On your first listen, the 50 score will reset to your actual listening duration.</string>
     <string name="inspector_played_expl">This track has been played before. Listening above 75% grants +20 points and boosts shuffle priority. Quick skips below 20s penalize -20 points (protected against recent plays).</string>
+    <!-- Lyrics and Translation HUD -->
+    <string name="lyrics_dialog_title">Live Synchronized Lyrics</string>
+    <string name="lyrics_loading">Searching global lyrics database…</string>
+    <string name="lyrics_not_found">No lyrics found for this track</string>
+    <string name="lyrics_retry">Retry Search</string>
+    <string name="lyrics_synced_hud">⚡ SYNCED HUD</string>
+    <string name="lyrics_plain_text">PLAIN TEXT</string>
+    <string name="lyrics_translation_active">Translation Active</string>
+    <string name="lyrics_translation_toggle">Translate</string>
+    <string name="action_lyrics">Live Lyrics</string>
+    <string name="bluetooth_autoplay_active">BT Auto-Play: ON</string>
+    <string name="bluetooth_autoplay_inactive">BT Auto-Play: OFF</string>
+    <string name="meta_genre">Genre: %s</string>
+    <string name="meta_lang">Language: %s</string>
+    <string name="meta_folder">Folder: %s</string>
+    <string name="meta_size">%1$.1f MB</string>
+    <string name="speed_label">Speed: %1$.2fx</string>
+    <string name="sleep_timer_off">Sleep Timer: Off</string>
+    <string name="action_forward_10">+10s</string>
+    <string name="action_rewind_10">-10s</string>
+    <string name="action_forward_15">+15s</string>
+    <string name="action_rewind_15">-15s</string>
+    <string name="action_restart_beginning">Restart from start</string>
+    <string name="resume_badge">⏱️ %s</string>
+    <string name="car_mode_title">Car Driving HUD</string>
+    <string name="car_mode_exit">Exit Car Mode</string>
+    <string name="car_mode_speed">Speed</string>
+    <string name="car_mode_auto_launch">Auto Car Mode</string>
+    <string name="ab_loop_title">A-B Repeat Loop</string>
+    <string name="ab_loop_set_a">Set A</string>
+    <string name="ab_loop_set_b">Set B</string>
+    <string name="ab_loop_clear">Clear</string>
+    <string name="ab_loop_active">Loop: %1$s ➜ %2$s</string>
 </resources>

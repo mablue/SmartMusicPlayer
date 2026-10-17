@@ -32,6 +32,13 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.BluetoothConnected
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -94,9 +101,19 @@ fun FullPlayerContent(
     onInfoClick: () -> Unit,
     onDeleteClick: (Song) -> Unit,
     onCollapse: () -> Unit,
+    onLyricsClick: () -> Unit = {},
+    isBluetoothAutoPlay: Boolean = true,
+    onToggleBluetoothAutoPlay: () -> Unit = {},
+    playbackSpeed: Float = 1.0f,
+    onSpeedChange: (Float) -> Unit = {},
+    sleepTimerMinutes: Int = 0,
+    onSleepTimerChange: (Int) -> Unit = {},
+    onSeekRelative: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showModeMenu by remember { mutableStateOf(false) }
+    var showSpeedMenu by remember { mutableStateOf(false) }
+    var showSleepMenu by remember { mutableStateOf(false) }
 
     val safeDuration = durationMs.coerceAtLeast(song?.durationMs ?: 180000L).coerceAtLeast(1000L)
     val progressFraction = (currentPositionMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
@@ -120,7 +137,7 @@ fun FullPlayerContent(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top Bar: Minimize handle / button, Title, Info, Delete
+        // Top Bar: Minimize handle / button, Title, Bluetooth, Lyrics, Info, Delete
         // Generous vertical spacing prevents overlapping notification bar & notch
         Row(
             modifier = Modifier
@@ -152,31 +169,65 @@ fun FullPlayerContent(
             )
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Bluetooth AutoPlay Toggle
+                IconButton(
+                    onClick = onToggleBluetoothAutoPlay,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .testTag("full_player_bluetooth")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.BluetoothConnected,
+                        contentDescription = if (isBluetoothAutoPlay) stringResource(R.string.bluetooth_autoplay_active) else stringResource(R.string.bluetooth_autoplay_inactive),
+                        tint = if (isBluetoothAutoPlay) NeonCyan else Color(0xFF64748B),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
                 if (song != null) {
+                    // Lyrics HUD Dialog Trigger
+                    IconButton(
+                        onClick = onLyricsClick,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .testTag("full_player_lyrics")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Subtitles,
+                            contentDescription = stringResource(R.string.action_lyrics),
+                            tint = NeonCyan,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    // Delete Song Button
                     IconButton(
                         onClick = { onDeleteClick(song) },
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(40.dp)
                             .testTag("full_player_delete")
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,
                             contentDescription = stringResource(R.string.action_delete_song),
-                            tint = NeonRose
+                            tint = NeonRose,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
 
+                // Rank Details Explainer
                 IconButton(
                     onClick = onInfoClick,
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(40.dp)
                         .testTag("full_player_info")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = stringResource(R.string.action_rank_details),
-                        tint = Color.White.copy(alpha = 0.85f)
+                        tint = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -280,6 +331,74 @@ fun FullPlayerContent(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Metadata HUD Chips: Genre, Language, Folder, Audio specs
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Genre
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = DarkSurfaceVariant,
+                    border = BorderStroke(0.5.dp, Color(0xFF475569))
+                ) {
+                    Text(
+                        text = "🎵 ${song.genre}",
+                        fontSize = 11.sp,
+                        color = Color(0xFFCBD5E1),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                    )
+                }
+
+                // Language
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = DarkSurfaceVariant,
+                    border = BorderStroke(0.5.dp, Color(0xFF475569))
+                ) {
+                    Text(
+                        text = "🌐 ${song.detectedLanguage}",
+                        fontSize = 11.sp,
+                        color = Color(0xFFCBD5E1),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                    )
+                }
+
+                // Folder
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = DarkSurfaceVariant,
+                    border = BorderStroke(0.5.dp, Color(0xFF475569))
+                ) {
+                    Text(
+                        text = "📁 ${song.folderName}",
+                        fontSize = 11.sp,
+                        color = Color(0xFFCBD5E1),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                        maxLines = 1
+                    )
+                }
+
+                // Size
+                if (song.fileSizeBytes > 0) {
+                    val sizeMb = song.fileSizeBytes.toDouble() / (1024.0 * 1024.0)
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = DarkSurfaceVariant,
+                        border = BorderStroke(0.5.dp, Color(0xFF475569))
+                    ) {
+                        Text(
+                            text = "💾 " + stringResource(R.string.meta_size, sizeMb),
+                            fontSize = 11.sp,
+                            color = Color(0xFF94A3B8),
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -321,68 +440,184 @@ fun FullPlayerContent(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Playback Mode Chip with Dropdown
-        Box {
-            Surface(
-                onClick = { showModeMenu = true },
-                shape = RoundedCornerShape(14.dp),
-                color = DarkSurfaceVariant,
-                border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.5f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // Chips Row: Playback Mode, Speed, and Sleep Timer
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Playback Mode Chip with Dropdown
+            Box {
+                Surface(
+                    onClick = { showModeMenu = true },
+                    shape = RoundedCornerShape(12.dp),
+                    color = DarkSurfaceVariant,
+                    border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.5f))
                 ) {
-                    val modeIcon = when (playbackMode) {
-                        PlaybackMode.SMART_SHUFFLE -> Icons.Default.AutoAwesome
-                        PlaybackMode.RANKED_FIRST -> Icons.Default.TrendingUp
-                        PlaybackMode.DISCOVERY -> Icons.Default.Explore
-                        PlaybackMode.SEQUENTIAL -> Icons.Default.FormatListNumbered
-                        PlaybackMode.REPEAT_ONE -> Icons.Default.RepeatOne
-                    }
-                    Icon(
-                        imageVector = modeIcon,
-                        contentDescription = null,
-                        tint = NeonCyan,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = stringResource(playbackMode.stringRes),
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                    Row(
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        val modeIcon = when (playbackMode) {
+                            PlaybackMode.SMART_SHUFFLE -> Icons.Default.AutoAwesome
+                            PlaybackMode.RANKED_FIRST -> Icons.Default.TrendingUp
+                            PlaybackMode.DISCOVERY -> Icons.Default.Explore
+                            PlaybackMode.SEQUENTIAL -> Icons.Default.FormatListNumbered
+                            PlaybackMode.REPEAT_ONE -> Icons.Default.RepeatOne
+                        }
+                        Icon(
+                            imageVector = modeIcon,
+                            contentDescription = null,
+                            tint = NeonCyan,
+                            modifier = Modifier.size(16.dp)
                         )
-                    )
+                        Text(
+                            text = stringResource(playbackMode.stringRes),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            ),
+                            maxLines = 1
+                        )
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = showModeMenu,
+                    onDismissRequest = { showModeMenu = false },
+                    modifier = Modifier.background(DarkSurfaceVariant)
+                ) {
+                    PlaybackMode.values().forEach { mode ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = stringResource(mode.stringRes),
+                                    color = if (mode == playbackMode) NeonCyan else Color.White,
+                                    fontWeight = if (mode == playbackMode) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                onModeChange(mode)
+                                showModeMenu = false
+                            }
+                        )
+                    }
                 }
             }
 
-            DropdownMenu(
-                expanded = showModeMenu,
-                onDismissRequest = { showModeMenu = false },
-                modifier = Modifier.background(DarkSurfaceVariant)
-            ) {
-                PlaybackMode.values().forEach { mode ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = stringResource(mode.stringRes),
-                                color = if (mode == playbackMode) NeonCyan else Color.White,
-                                fontWeight = if (mode == playbackMode) FontWeight.Bold else FontWeight.Normal
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Playback Speed Chip with Dropdown
+            Box {
+                Surface(
+                    onClick = { showSpeedMenu = true },
+                    shape = RoundedCornerShape(12.dp),
+                    color = DarkSurfaceVariant,
+                    border = BorderStroke(1.dp, NeonAmber.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Speed,
+                            contentDescription = null,
+                            tint = NeonAmber,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "${playbackSpeed}x",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
                             )
-                        },
-                        onClick = {
-                            onModeChange(mode)
-                            showModeMenu = false
-                        }
-                    )
+                        )
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = showSpeedMenu,
+                    onDismissRequest = { showSpeedMenu = false },
+                    modifier = Modifier.background(DarkSurfaceVariant)
+                ) {
+                    listOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "${speed}x",
+                                    color = if (speed == playbackSpeed) NeonAmber else Color.White,
+                                    fontWeight = if (speed == playbackSpeed) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                onSpeedChange(speed)
+                                showSpeedMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Sleep Timer Chip with Dropdown
+            Box {
+                Surface(
+                    onClick = { showSleepMenu = true },
+                    shape = RoundedCornerShape(12.dp),
+                    color = DarkSurfaceVariant,
+                    border = BorderStroke(1.dp, if (sleepTimerMinutes > 0) NeonEmerald else DarkSurfaceBorder)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = null,
+                            tint = if (sleepTimerMinutes > 0) NeonEmerald else Color(0xFF94A3B8),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = if (sleepTimerMinutes > 0) "${sleepTimerMinutes}m" else "Sleep",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = if (sleepTimerMinutes > 0) NeonEmerald else Color(0xFFCBD5E1)
+                            )
+                        )
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = showSleepMenu,
+                    onDismissRequest = { showSleepMenu = false },
+                    modifier = Modifier.background(DarkSurfaceVariant)
+                ) {
+                    listOf(0, 15, 30, 45, 60).forEach { mins ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = if (mins == 0) stringResource(R.string.sleep_timer_off) else "$mins mins",
+                                    color = if (mins == sleepTimerMinutes) NeonEmerald else Color.White,
+                                    fontWeight = if (mins == sleepTimerMinutes) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                onSleepTimerChange(mins)
+                                showSleepMenu = false
+                            }
+                        )
+                    }
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Main Controls: Previous, Play/Pause, Next
+        // Main Controls: Previous, -10s, Play/Pause, +10s, Next
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -390,17 +625,32 @@ fun FullPlayerContent(
         ) {
             IconButton(
                 onClick = onSkipPrevious,
-                modifier = Modifier.size(54.dp)
+                modifier = Modifier.size(46.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipPrevious,
                     contentDescription = stringResource(R.string.action_previous),
                     tint = Color.White,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(32.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(24.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // -10s Rewind
+            IconButton(
+                onClick = { onSeekRelative(-10000L) },
+                modifier = Modifier.size(46.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FastRewind,
+                    contentDescription = stringResource(R.string.action_rewind_10),
+                    tint = Color(0xFFCBD5E1),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
 
             // Play / Pause Button
             Surface(
@@ -420,18 +670,33 @@ fun FullPlayerContent(
                 }
             }
 
-            Spacer(modifier = Modifier.width(24.dp))
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // +10s Forward
+            IconButton(
+                onClick = { onSeekRelative(10000L) },
+                modifier = Modifier.size(46.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FastForward,
+                    contentDescription = stringResource(R.string.action_forward_10),
+                    tint = Color(0xFFCBD5E1),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
 
             // Next / Skip Button
             IconButton(
                 onClick = onSkipNext,
-                modifier = Modifier.size(54.dp)
+                modifier = Modifier.size(46.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipNext,
                     contentDescription = stringResource(R.string.action_next),
                     tint = Color.White,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(32.dp)
                 )
             }
         }

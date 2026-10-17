@@ -24,16 +24,18 @@ class SongRepository(
     private val context: Context
 ) {
 
+    private val prefs by lazy { com.example.data.preferences.PlaybackPreferences.getInstance(context) }
+
     val allSongs: Flow<List<Song>> = songDao.getAllSongs().map { list ->
-        list.map { it.toSong() }
+        list.map { it.toSong().copy(resumePositionMs = prefs.getSongResumePosition(it.id)) }
     }
 
     val rankedSongs: Flow<List<Song>> = songDao.getRankedSongs().map { list ->
-        list.map { it.toSong() }
+        list.map { it.toSong().copy(resumePositionMs = prefs.getSongResumePosition(it.id)) }
     }
 
     val unplayedSongs: Flow<List<Song>> = songDao.getUnplayedSongs().map { list ->
-        list.map { it.toSong() }
+        list.map { it.toSong().copy(resumePositionMs = prefs.getSongResumePosition(it.id)) }
     }
 
     suspend fun updateSong(song: Song) = withContext(Dispatchers.IO) {
@@ -140,7 +142,10 @@ class SongRepository(
                 MediaStore.Audio.Media.TITLE,
                 MediaStore.Audio.Media.ARTIST,
                 MediaStore.Audio.Media.ALBUM,
-                MediaStore.Audio.Media.DURATION
+                MediaStore.Audio.Media.DURATION,
+                MediaStore.Audio.Media.DATA,
+                MediaStore.Audio.Media.SIZE,
+                MediaStore.Audio.Media.MIME_TYPE
             )
 
             val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
@@ -158,6 +163,9 @@ class SongRepository(
                 val artistCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
                 val albumCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
                 val durationCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+                val dataCol = it.getColumnIndex(MediaStore.Audio.Media.DATA)
+                val sizeCol = it.getColumnIndex(MediaStore.Audio.Media.SIZE)
+                val mimeCol = it.getColumnIndex(MediaStore.Audio.Media.MIME_TYPE)
 
                 while (it.moveToNext()) {
                     val mediaId = it.getLong(idCol)
@@ -165,6 +173,36 @@ class SongRepository(
                     val artist = it.getString(artistCol)?.trim() ?: "Unknown Artist"
                     val album = it.getString(albumCol)?.trim() ?: "Album"
                     val duration = it.getLong(durationCol)
+                    val filePath = if (dataCol >= 0) it.getString(dataCol) ?: "" else ""
+                    val fileSizeBytes = if (sizeCol >= 0) it.getLong(sizeCol) else 0L
+                    val mimeType = if (mimeCol >= 0) it.getString(mimeCol) ?: "audio/mpeg" else "audio/mpeg"
+
+                    // Extract parent folder name
+                    val folderName = if (filePath.isNotEmpty()) {
+                        try {
+                            java.io.File(filePath).parentFile?.name ?: "Music"
+                        } catch (e: Exception) {
+                            "Music"
+                        }
+                    } else "Music"
+
+                    // Low-cost heuristic language & genre detection
+                    val detectedLang = when {
+                        Regex("[\u0600-\u06FF]").containsMatchIn("$title $artist $album") -> "Persian"
+                        Regex("[a-zA-Z]").containsMatchIn("$title $artist") -> "English"
+                        else -> "Instrumental"
+                    }
+
+                    val detectedGenre = when {
+                        folderName.contains("rock", ignoreCase = true) || title.contains("rock", ignoreCase = true) -> "Rock"
+                        folderName.contains("pop", ignoreCase = true) || title.contains("pop", ignoreCase = true) -> "Pop"
+                        folderName.contains("electro", ignoreCase = true) || folderName.contains("edm", ignoreCase = true) || title.contains("remix", ignoreCase = true) -> "Electronic"
+                        folderName.contains("rap", ignoreCase = true) || folderName.contains("hip", ignoreCase = true) -> "Hip-Hop"
+                        folderName.contains("traditional", ignoreCase = true) || folderName.contains("sonati", ignoreCase = true) -> "Traditional"
+                        folderName.contains("jazz", ignoreCase = true) -> "Jazz"
+                        folderName.contains("classic", ignoreCase = true) -> "Classical"
+                        else -> "Music"
+                    }
 
                     // Ignore very short audio files (notification pings under 10 seconds)
                     if (duration > 10_000L) {
@@ -190,7 +228,13 @@ class SongRepository(
                             durationMs = duration,
                             uri = contentUri,
                             isUnplayed = true,
-                            score = 50.0f
+                            score = 50.0f,
+                            folderName = folderName,
+                            fileSizeBytes = fileSizeBytes,
+                            bitrateKbps = 320,
+                            mimeType = mimeType,
+                            detectedLanguage = detectedLang,
+                            genre = detectedGenre
                         )
 
                         val insertedId = songDao.insertSong(SongEntity.fromSong(newSong))

@@ -20,7 +20,14 @@ data class SongEntity(
     val lastListenRatio: Float = 0.0f,
     val lastPlayedTimestamp: Long = 0L,
     val colorHex: String = "#8B5CF6",
-    val genre: String = "Music"
+    val genre: String = "Music",
+    val folderName: String = "Music",
+    val fileSizeBytes: Long = 0L,
+    val bitrateKbps: Int = 320,
+    val mimeType: String = "audio/mpeg",
+    val detectedLanguage: String = "Auto",
+    val lyrics: String = "",
+    val syncedLyrics: String = ""
 ) {
     fun toSong(): Song = Song(
         id = id,
@@ -36,7 +43,14 @@ data class SongEntity(
         lastListenRatio = lastListenRatio,
         lastPlayedTimestamp = lastPlayedTimestamp,
         colorHex = colorHex,
-        genre = genre
+        genre = genre,
+        folderName = folderName,
+        fileSizeBytes = fileSizeBytes,
+        bitrateKbps = bitrateKbps,
+        mimeType = mimeType,
+        detectedLanguage = detectedLanguage,
+        lyrics = lyrics,
+        syncedLyrics = syncedLyrics
     )
 
     companion object {
@@ -54,7 +68,14 @@ data class SongEntity(
             lastListenRatio = song.lastListenRatio,
             lastPlayedTimestamp = song.lastPlayedTimestamp,
             colorHex = song.colorHex,
-            genre = song.genre
+            genre = song.genre,
+            folderName = song.folderName,
+            fileSizeBytes = song.fileSizeBytes,
+            bitrateKbps = song.bitrateKbps,
+            mimeType = song.mimeType,
+            detectedLanguage = song.detectedLanguage,
+            lyrics = song.lyrics,
+            syncedLyrics = song.syncedLyrics
         )
     }
 }

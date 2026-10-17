@@ -1,60 +1,124 @@
-<!-- LATEST_RELEASE_START -->
-<!-- LATEST_RELEASE_END -->
+# 🎵 SmartMusic — Adaptive Ranking & Smart Shuffle Music Player
 
-# SmartPlayer 🎵
+[![Android CI / CD Build](https://github.com/user/smartmusic/actions/workflows/build.yml/badge.svg)](https://github.com/user/smartmusic/actions/workflows/build.yml)
+[![Platform](https://img.shields.io/badge/Platform-Android_24+-3DDC84.svg?logo=android)](https://developer.android.com)
+[![Kotlin](https://img.shields.io/badge/Language-Kotlin_2.0-7F52FF.svg?logo=kotlin)](https://kotlinlang.org)
+[![Compose](https://img.shields.io/badge/UI-Jetpack_Compose_M3-4285F4.svg?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> A smart music player that learns what you love — one skip at a time.
+An intelligent, futuristic offline Android audio player built with **Jetpack Compose (Material 3)**, **Room Database**, and a dynamic **Behavioral Affinity Ranking Engine**. 
 
-SmartPlayer is an Android music player built with **Kotlin** and **Jetpack Compose** that ranks every track by how you actually listen to it. No manual ratings. No playlists to curate. The algorithm watches your behavior and quietly decides what deserves a spot in the shuffle.
-
----
-
-## ✨ Features
-
-- 🎧 **Smart weighted shuffle** — tracks are picked by score, not randomly
-- 🧠 **Learns from behavior** — skips, listens, and re-listens all feed the ranking
-- 🛡️ **Fatigue protection** — recent skips don't get punished twice
-- 🎨 **Modern Compose UI** — Material 3, dark theme, smooth animations
-- 📊 **Analytics tab** — see your top tracks and listening trends
-- 🔒 **100% offline** — no accounts, no cloud, no tracking
+Instead of treating all songs equally or requiring cumbersome 5-star manual tagging, SmartMusic learns your genuine music affinity in real time by observing how long you actually listen to each song.
 
 ---
 
-## 🧮 Ranking & Selection Formula
+## 🌟 Key Features
 
-SmartPlayer doesn't ask "did you like this?" — it watches **how** you listen. Every track carries a score that evolves with each play, and the shuffle is weighted so higher-scored tracks show up more often.
+### 🧠 1. Smart Behavioral Affinity Engine
+- **Fair Exploration Score (50 pts):** Newly discovered tracks enter the library with a neutral score of 50, guaranteeing they receive immediate playtime in Smart Shuffle.
+- **First Impression Calibration:** On the very first listen, the placeholder score of 50 resets directly based on engagement:
+  - Skip before 20s $\to$ Resets to **20 pts** (*Disliked Tier*).
+  - Listened through $\ge 75\%$ $\to$ Resets to **80 pts** (*Diamond/Gold Tier*).
+- **Recent Fatigue Protection (8-Minute Window):** If you recently completed a full listen of a song, skipping it during a subsequent play does **not** penalize the song. The engine recognizes natural listening fatigue rather than genuine dislike.
+- **Weighted Mathematical Shuffle:** Playback probability in Smart Shuffle mode is proportional to:
+  $$P(\text{song}_i) = \frac{(\text{Score}_i)^{1.3}}{\sum (\text{Score}_j)^{1.3}}$$
+  Your favorite tracks surface frequently without completely starving newer or neutral songs.
 
-### 1. First encounter — *Unplayed tracks*
+### 🎧 2. Full Media Notification & Background Service
+- Real-time **Foreground Media Playback Service** with `android.media.session.MediaSession`.
+- Full lockscreen controls: **Previous**, **Play / Pause**, **Next**, and custom **+20 Love** boost action.
+- Automatic track title, artist, score points, and tier display directly on the system lockscreen and notification shade.
 
-Every new track enters the library with a **neutral score of `50`**.
-This guarantees a fair chance in the smart shuffle — no track is buried before it's ever heard.
+### 🌐 3. Real-Time Lyrics HUD & Simultaneous Translation
+- High-speed query engine integrating **LRCLIB** (open-source synced lyrics registry).
+- **Synchronized HUD Mode:** Highlights the active line with smooth auto-scrolling to the playback timestamp. Tap any line to seek immediately.
+- **Simultaneous Translation:** One-tap real-time translation into Persian (`fa`) or English (`en`) without requiring paid third-party API keys.
 
-### 2. First impression — *The reset rule*
+### 📡 4. Hardware Telemetry & Low-Cost Metadata Extraction
+- **Zero-lag Heuristics:** Automatically detects song genre, language (Persian, English, Instrumental), folder hierarchy, and file size in megabytes without disk strain.
+- **Bluetooth Auto-Play & Safety Disconnect:** Automatically resumes playback when connecting to Bluetooth headsets or car audio units. Automatically pauses when disconnected to prevent public loudspeaker blasting (`AUDIO_BECOMING_NOISY`).
 
-The first play is special. It decides the track's starting personality:
+### 🗑️ 5. Android 11+ Scoped Storage Physical Deletion
+- True storage deletion via `MediaStore.createDeleteRequest` and ContentResolver fallback.
+- **Smart Next-Track Transition:** Deleting a song gracefully advances to the next track in the queue without interrupting playback state or applying negative algorithmic penalties.
+- Notch-safe and status-bar-safe padding to guarantee complete visibility on modern edge-to-edge displays.
 
-| Behavior on first play | New score | Label |
-|---|---|---|
-| Skipped **before 20 seconds** | `20` | 🔻 *Disliked* |
-| Listened **past 20 seconds** | `80` | ⭐ *Gold affinity* |
+### 💾 6. State Persistence
+- Remembers active track ID, position in milliseconds, queue configuration, and user preferences across app restarts.
 
-The `50` placeholder is discarded — the track is now judged by how you actually reacted.
+---
 
-### 3. Subsequent plays — *The ongoing opinion*
+## 🏗️ Architecture & Technology Stack
 
-| Behavior | Change |
-|---|---|
-| Early skip (< 20s) | `−20` |
-| Full play | `+20` |
+```
+SmartMusic
+├── data
+│   ├── db              # Room DB: SongEntity, SongDao, Migrations
+│   ├── lyrics          # LRCLIB & Google Translate client
+│   ├── model           # Immutable Song models, RankTier, SessionEvaluation
+│   ├── preferences     # PlaybackPreferences (State preservation)
+│   └── repository      # SongRepository (MediaStore scanner, physical deletion)
+├── engine              # SmartRankingEngine & PlaybackMode enums
+├── player              # SmartAudioPlayer, MediaPlaybackService, BluetoothAudioReceiver
+├── ui
+│   ├── components      # FullPlayerContent, MiniPlayerBar, LyricsViewDialog, VisualizerWaves
+│   ├── screens         # HomeScreen, LibraryTab, RankingsTab, DiscoveryTab, AnalyticsTab
+│   ├── theme           # Cyberpunk/Neon Dark M3 Theme
+│   └── viewmodel       # MusicPlayerViewModel
+└── MainActivity.kt     # Edge-to-edge Compose container
+```
 
-Each listen nudges the score up or down. A track you love climbs to `100+`. A track you hate sinks to `0` and stops appearing in the shuffle.
+---
 
-### 4. Fatigue protection — *The 8-minute rule*
+## 🚀 CI / CD Build Workflow
 
-If you skip a track that was **already played within the last 8 minutes**, the penalty is **bypassed**.
+This repository includes a ready-to-run **GitHub Actions Workflow** located at `.github/workflows/build.yml`.
 
-*Why?* You might skip because you're not in the mood, not because you dislike the song. Without this rule, one bad session could permanently damage the score of a track you actually love.
+### Automated Artifacts
+Every push to `main`, `master`, or tags will automatically:
+1. Initialize JDK 17 and configure Android SDK build tools.
+2. Generate signing keys (either from your repository secrets or self-signed CI fallback).
+3. Build both **Debug** and **Release** APKs.
+4. Upload both APKs to the GitHub Actions **Artifacts** tab for instant download.
 
-### 5. Weighted shuffle — *Probability is not linear*
+### Custom Release Signing (Optional)
+To sign release APKs with your production keystore, add the following secrets in **GitHub Repository Settings $\to$ Secrets and variables $\to$ Actions**:
+- `SIGNING_KEYSTORE_BASE64`: Base64 encoded `.jks` or `.keystore` file (`base64 -w 0 my-upload-key.jks`).
+- `KEYSTORE_PASSWORD`: Keystore password.
+- `KEY_ALIAS`: Key alias.
+- `KEY_PASSWORD`: Key password.
 
-When picking the next track, SmartPlayer doesn't just favor higher scores — it **supercharges** them.
+---
+
+## 🛠️ Local Build Instructions
+
+```bash
+# 1. Clone repository
+git clone https://github.com/user/smartmusic.git
+cd smartmusic
+
+# 2. Grant gradlew permissions
+chmod +x gradlew
+
+# 3. Build Debug APK
+./gradlew assembleDebug
+
+# 4. Build Release APK
+./gradlew assembleRelease
+
+# Output APK paths:
+# app/build/outputs/apk/debug/app-debug.apk
+# app/build/outputs/apk/release/app-release.apk
+```
+
+---
+
+## 🌍 Localization & Language Support
+
+- **Default Language:** English (`values/strings.xml`).
+- **Persian Language:** Automatic fallback (`values-fa/strings.xml`) only when the device system locale is set to Persian (`fa`).
+
+---
+
+## 📄 License
+This project is open-source and available under the [MIT License](LICENSE).

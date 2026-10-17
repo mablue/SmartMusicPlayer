@@ -86,6 +86,7 @@ import com.example.ui.components.AlgorithmInspectorDialog
 import com.example.ui.components.AnalyticsTab
 import com.example.ui.components.EvaluationBanner
 import com.example.ui.components.FullPlayerContent
+import com.example.ui.components.LyricsViewDialog
 import com.example.ui.components.MiniPlayerBar
 import com.example.ui.components.SongListItem
 import com.example.ui.theme.DarkBackground
@@ -118,6 +119,8 @@ fun HomeScreen(
     val durationMs by viewModel.player.durationMs.collectAsStateWithLifecycle()
     val playbackMode by viewModel.player.playbackMode.collectAsStateWithLifecycle()
     val lastEvaluation by viewModel.player.lastEvaluation.collectAsStateWithLifecycle()
+    val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
+    val sleepTimerMinutes by viewModel.sleepTimerMinutes.collectAsStateWithLifecycle()
 
     var showGeneralInfoDialog by remember { mutableStateOf(false) }
 
@@ -181,7 +184,15 @@ fun HomeScreen(
                 currentSong?.let { viewModel.setInspectingSong(it) } ?: run { showGeneralInfoDialog = true }
             },
             onDeleteClick = { song -> viewModel.requestDeleteSong(song) },
-            onCollapse = { viewModel.setShowFullPlayer(false) }
+            onCollapse = { viewModel.setShowFullPlayer(false) },
+            onLyricsClick = { viewModel.setShowLyricsSheet(true) },
+            isBluetoothAutoPlay = uiState.isBluetoothAutoPlay,
+            onToggleBluetoothAutoPlay = { viewModel.toggleBluetoothAutoPlay() },
+            playbackSpeed = playbackSpeed,
+            onSpeedChange = { viewModel.setPlaybackSpeed(it) },
+            sleepTimerMinutes = sleepTimerMinutes,
+            onSleepTimerChange = { viewModel.setSleepTimer(it) },
+            onSeekRelative = { viewModel.seekRelative(it) }
         )
     } else {
         Scaffold(
@@ -520,6 +531,25 @@ fun HomeScreen(
         AlgorithmInspectorDialog(
             song = dummySeedSong,
             onDismiss = { showGeneralInfoDialog = false }
+        )
+    }
+
+    // Live Lyrics and Translation Dialog
+    if (uiState.showLyricsSheet) {
+        val lyricsResult by viewModel.lyricsResult.collectAsStateWithLifecycle()
+        val isFetchingLyrics by viewModel.isFetchingLyrics.collectAsStateWithLifecycle()
+        val isTranslatingLyrics by viewModel.isTranslatingLyrics.collectAsStateWithLifecycle()
+
+        LyricsViewDialog(
+            song = currentSong,
+            lyricsResult = lyricsResult,
+            isLoading = isFetchingLyrics,
+            isTranslating = isTranslatingLyrics,
+            currentPositionMs = currentPositionMs,
+            onSeekTo = { viewModel.seekTo(it) },
+            onRetryFetch = { viewModel.fetchLyricsForCurrent() },
+            onTranslate = { targetLang -> viewModel.translateLyrics(targetLang) },
+            onDismiss = { viewModel.setShowLyricsSheet(false) }
         )
     }
 }
