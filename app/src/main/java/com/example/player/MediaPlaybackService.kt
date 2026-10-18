@@ -261,7 +261,7 @@ class MediaPlaybackService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(isPlaying)
             .addAction(android.R.drawable.ic_media_previous, getString(R.string.action_previous), prevPending)
-            .addAction(android.R.drawable.ic_media_rewind, getString(R.string.action_rewind_15), rewind15Pending)
+            .addAction(0, getString(R.string.action_rewind_15), rewind15Pending)
             .addAction(playPauseIcon, playPauseText, playPausePending)
             .addAction(android.R.drawable.ic_media_ff, getString(R.string.action_forward_15), forward15Pending)
             .addAction(android.R.drawable.ic_media_next, getString(R.string.action_next), nextPending)
