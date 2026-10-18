@@ -1,9 +1,22 @@
 name: Release
 
 on:
+  # ۱) خودکار بعد از اتمام CI/CD
   workflow_run:
     workflows: ["Android CI / CD Build"]
     types: [completed]
+
+  # ۲) دستی با دکمه سبز Run workflow
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v1.0.0)'
+        required: true
+        type: string
+      run_id:
+        description: 'CI/CD run ID (leave empty = latest successful run)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -14,50 +27,76 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    # فقط وقتی CI/CD موفق بوده و روی تگ v* اجرا شده
+    # اجرای خودکار فقط وقتی CI/CD موفق و روی تگ v* بوده
     if: |
-      github.event.workflow_run.conclusion == 'success' &&
-      startsWith(github.event.workflow_run.head_branch, 'v')
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
 
     steps:
-      - name: Checkout (same commit as CI/CD)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
-      - name: Resolve version tag
-        id: v
-        run: echo "ver=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_OUTPUT
+      - name: Resolve version + run_id
+        id: r
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "ver=${{ inputs.version }}" >> $GITHUB_OUTPUT
+            RID="${{ inputs.run_id }}"
+            if [ -z "$RID" ]; then
+              echo "No run_id provided → fetching latest successful CI/CD run..."
+              RID=$(gh run list \
+                --repo "${{ github.repository }}" \
+                --workflow "Android CI / CD Build" \
+                --status success \
+                --limit 1 \
+                --json databaseId \
+                --jq '.[0].databaseId')
+            fi
+            if [ -z "$RID" ] || [ "$RID" = "null" ]; then
+              echo "❌ هیچ اجرای موفق CI/CD پیدا نشد. لطفاً run_id را دستی بده."
+              exit 1
+            fi
+            echo "run_id=$RID" >> $GITHUB_OUTPUT
+          else
+            echo "ver=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_OUTPUT
+            echo "run_id=${{ github.event.workflow_run.id }}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Download Debug APK from CI/CD
         uses: actions/download-artifact@v4
         with:
           name: SmartMusic-Debug-APK
           path: out
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ steps.r.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
       - name: Download Release APK from CI/CD
         uses: actions/download-artifact@v4
         with:
           name: SmartMusic-Release-APK
           path: out
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ steps.r.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
-      - name: Show files to be uploaded
-        run: ls -la out/
+      - name: Show files
+        run: |
+          echo "── Downloaded files ──"
+          ls -la out/ || echo "⚠️ هیچ فایلی دانلود نشد"
 
       - name: Create / Update Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.v.outputs.ver }}
-          name: SmartPlayer ${{ steps.v.outputs.ver }}
+          tag_name: ${{ steps.r.outputs.ver }}
+          name: SmartPlayer ${{ steps.r.outputs.ver }}
           generate_release_notes: true
-          files: |
-            out/*debug*.apk
-            out/*release*.apk
+          files: out/*.apk
           draft: false
           prerelease: false
           make_latest: true
