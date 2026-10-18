@@ -86,15 +86,23 @@ class SmartAudioPlayer(
     var currentPlaylist: List<Song> = emptyList()
 
     private var lastPlayedSongId: Long? = null
+    @Volatile
+    private var isSeeking = false
 
     private val progressUpdater = object : Runnable {
         override fun run() {
             mediaPlayer?.let { player ->
-                if (player.isPlaying) {
+                if (player.isPlaying && !isSeeking) {
                     val pos = player.currentPosition.toLong()
-                    _currentPositionMs.value = pos
                     val dur = player.duration.coerceAtLeast(0).toLong()
-                    _durationMs.value = dur
+                    if (dur > 0) {
+                        _durationMs.value = dur
+                    }
+
+                    // Guard against MediaPlayer temporarily reporting 0 while seeking to saved resume position
+                    if (pos > 0 || _currentPositionMs.value < 1000L) {
+                        _currentPositionMs.value = pos
+                    }
 
                     // Check A-B Repeat Loop
                     if (_abLoopActive.value) {
@@ -107,7 +115,7 @@ class SmartAudioPlayer(
                     }
 
                     // Periodic save of playback position (every 2 seconds)
-                    if (pos % 2000L < 300L) {
+                    if (pos > 0 && pos % 2000L < 300L) {
                         prefs.lastPositionMs = pos
                         _currentSong.value?.let { s ->
                             prefs.saveSongResumePosition(s.id, pos, dur)
@@ -231,8 +239,19 @@ class SmartAudioPlayer(
                 }
 
                 prepare()
-                if (startAtMs > 0) {
-                    seekTo(startAtMs.toInt())
+                val realDur = duration.toLong()
+                val safeTarget = if (realDur > 0) {
+                    targetStartMs.coerceIn(0L, (realDur - 800L).coerceAtLeast(0L))
+                } else {
+                    targetStartMs
+                }
+
+                if (safeTarget > 0) {
+                    isSeeking = true
+                    seekTo(safeTarget.toInt())
+                    setOnSeekCompleteListener {
+                        isSeeking = false
+                    }
                 }
                 start()
 
@@ -296,6 +315,10 @@ class SmartAudioPlayer(
     }
 
     fun seekTo(positionMs: Long) {
+        isSeeking = true
+        mediaPlayer?.setOnSeekCompleteListener {
+            isSeeking = false
+        }
         mediaPlayer?.seekTo(positionMs.toInt())
         _currentPositionMs.value = positionMs
         prefs.lastPositionMs = positionMs
@@ -384,16 +407,32 @@ class SmartAudioPlayer(
     }
 
     fun skipPrevious() {
-        if (_currentPositionMs.value > 4000L) {
-            seekTo(0)
-            return
-        }
         val song = _currentSong.value
+        if (song != null) {
+            prefs.saveSongResumePosition(song.id, _currentPositionMs.value, _durationMs.value)
+        }
         val currentIndex = currentPlaylist.indexOfFirst { it.id == song?.id }
-        if (currentIndex > 0) {
-            playSong(currentPlaylist[currentIndex - 1])
+        val prevSong = if (currentIndex > 0) {
+            currentPlaylist[currentIndex - 1]
         } else if (currentPlaylist.isNotEmpty()) {
-            playSong(currentPlaylist.last())
+            currentPlaylist.last()
+        } else null
+
+        prevSong?.let {
+            playSong(it)
+        }
+    }
+
+    fun restartCurrentSong() {
+        val song = _currentSong.value ?: return
+        prefs.saveSongResumePosition(song.id, 0L, _durationMs.value)
+        seekTo(0)
+    }
+
+    fun updateCurrentSongMetadata(updatedSong: Song) {
+        if (_currentSong.value?.id == updatedSong.id) {
+            _currentSong.value = updatedSong
+            updateNotification()
         }
     }
 
@@ -424,17 +463,21 @@ class SmartAudioPlayer(
     private fun handleTrackCompletion(song: Song, isConsecutiveReplay: Boolean) {
         _isPlaying.value = false
         val total = _durationMs.value.coerceAtLeast(song.durationMs)
+        val pos = _currentPositionMs.value
+
+        // Only clear resume position if user truly listened to the full track (>85% or within last 4s)
+        val isRealFullPlay = (total > 0 && pos >= total * 0.85f) || (total > 4000L && (total - pos) <= 4000L)
+        if (isRealFullPlay) {
+            prefs.saveSongResumePosition(song.id, 0L, song.durationMs)
+        }
 
         evaluateAndSaveSession(
             song = song,
-            listenedMs = total,
+            listenedMs = if (isRealFullPlay) total else pos,
             totalMs = total,
             isManualSkip = false,
             isConsecutiveReplay = isConsecutiveReplay
         )
-
-        // Reset resume position to 0 since user finished listening to the whole track!
-        prefs.saveSongResumePosition(song.id, 0L, song.durationMs)
 
         if (_playbackMode.value == PlaybackMode.REPEAT_ONE) {
             playSong(song)

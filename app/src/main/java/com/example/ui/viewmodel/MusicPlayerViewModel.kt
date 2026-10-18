@@ -23,7 +23,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 enum class AppTab(val titleFa: String, val titleEn: String) {
-    LIBRARY("کتابخانه", "Library"),
+    LIBRARY("موزیک‌ها", "Music"),
+    PODCASTS("پادکست و کتب", "Podcasts"),
     RANKINGS("رتبه‌بندی", "Rankings"),
     DISCOVERY("نشنیده‌ها", "Discovery"),
     ANALYTICS("آمار و تحلیل", "Analytics")
@@ -32,15 +33,25 @@ enum class AppTab(val titleFa: String, val titleEn: String) {
 data class PlayerUiState(
     val searchQuery: String = "",
     val selectedTierFilter: RankTier? = null,
+    val selectedFolder: String? = null,
+    val sortOrder: com.example.data.model.SongSortOrder = com.example.data.model.SongSortOrder.DEFAULT,
+    val isSelectionMode: Boolean = false,
+    val selectedSongIds: Set<Long> = emptySet(),
     val selectedTab: AppTab = AppTab.LIBRARY,
     val inspectingSong: Song? = null,
     val songToDelete: Song? = null,
+    val editingSongTags: Song? = null,
     val pendingDeleteIntentSender: android.content.IntentSender? = null,
     val showFullPlayer: Boolean = false,
     val showLyricsSheet: Boolean = false,
+    val showSettings: Boolean = false,
+    val showCarMode: Boolean = false,
     val isScanning: Boolean = false,
     val scanResultMsg: String? = null,
-    val isBluetoothAutoPlay: Boolean = true
+    val isBluetoothAutoPlay: Boolean = true,
+    val isCarModeAutoLaunch: Boolean = false,
+    val isLyricsTranslation: Boolean = true,
+    val targetLanguage: String = "fa"
 )
 
 class MusicPlayerViewModel(application: Application) : AndroidViewModel(application) {
@@ -61,7 +72,12 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _uiState = MutableStateFlow(
-        PlayerUiState(isBluetoothAutoPlay = prefs.isBluetoothAutoPlayEnabled)
+        PlayerUiState(
+            isBluetoothAutoPlay = prefs.isBluetoothAutoPlayEnabled,
+            isCarModeAutoLaunch = prefs.isCarModeAutoLaunchEnabled,
+            isLyricsTranslation = prefs.isLyricsTranslationEnabled,
+            targetLanguage = prefs.targetTranslationLanguage
+        )
     )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
@@ -70,25 +86,67 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     val isTranslatingLyrics: StateFlow<Boolean> = player.isTranslatingLyrics
     val playbackSpeed: StateFlow<Float> = player.playbackSpeed
     val sleepTimerMinutes: StateFlow<Int> = player.sleepTimerMinutes
+    val abLoopActive: StateFlow<Boolean> = player.abLoopActive
+    val abLoopStartMs: StateFlow<Long?> = player.abLoopStartMs
+    val abLoopEndMs: StateFlow<Long?> = player.abLoopEndMs
 
-    // Filtered songs for Library tab
+    // Distinct folders available in library
+    val availableFolders: StateFlow<List<String>> = combine(allSongs) { songsArray ->
+        val songs = songsArray[0]
+        songs.map { it.folderName }.filter { it.isNotBlank() }.distinct().sorted()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Music songs (excluding Podcasts & Audiobooks) with filtering, folder selection, and sorting
     val filteredLibrarySongs: StateFlow<List<Song>> = combine(allSongs, _uiState) { songs, state ->
         val query = state.searchQuery.trim().lowercase()
         val tier = state.selectedTierFilter
-        if (query.isEmpty() && tier == null) {
-            songs
-        } else {
-            songs.filter { song ->
-                val matchesQuery = query.isEmpty() ||
-                        song.title.lowercase().contains(query) ||
+        val folder = state.selectedFolder
+
+        var list = songs.filter { !it.isPodcastOrAudiobook }
+
+        if (folder != null) {
+            list = list.filter { it.folderName.equals(folder, ignoreCase = true) }
+        }
+
+        if (tier != null) {
+            list = list.filter { it.rankTier == tier }
+        }
+
+        if (query.isNotEmpty()) {
+            list = list.filter { song ->
+                song.title.lowercase().contains(query) ||
                         song.artist.lowercase().contains(query) ||
                         song.album.lowercase().contains(query) ||
                         song.genre.lowercase().contains(query) ||
                         song.folderName.lowercase().contains(query)
-                val matchesTier = tier == null || song.rankTier == tier
-                matchesQuery && matchesTier
             }
         }
+
+        when (state.sortOrder) {
+            com.example.data.model.SongSortOrder.DEFAULT -> list // already sorted by smart affinity / score
+            com.example.data.model.SongSortOrder.DURATION_DESC -> list.sortedByDescending { it.durationMs }
+            com.example.data.model.SongSortOrder.DURATION_ASC -> list.sortedBy { it.durationMs }
+            com.example.data.model.SongSortOrder.SIZE_DESC -> list.sortedByDescending { it.fileSizeBytes }
+            com.example.data.model.SongSortOrder.SIZE_ASC -> list.sortedBy { it.fileSizeBytes }
+            com.example.data.model.SongSortOrder.TITLE_ASC -> list.sortedBy { it.title.lowercase() }
+            com.example.data.model.SongSortOrder.ARTIST_ASC -> list.sortedBy { it.artist.lowercase() }
+        }
+    }.flowOn(Dispatchers.Default)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Dedicated Podcasts & Audiobooks list
+    val podcastAndAudiobooks: StateFlow<List<Song>> = combine(allSongs, _uiState) { songs, state ->
+        val query = state.searchQuery.trim().lowercase()
+        var list = songs.filter { it.isPodcastOrAudiobook }
+        if (query.isNotEmpty()) {
+            list = list.filter { song ->
+                song.title.lowercase().contains(query) ||
+                        song.artist.lowercase().contains(query) ||
+                        song.album.lowercase().contains(query) ||
+                        song.folderName.lowercase().contains(query)
+            }
+        }
+        list.sortedByDescending { it.lastPlayedTimestamp }
     }.flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -139,6 +197,55 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     fun fetchLyricsForCurrent() {
         player.currentSong.value?.let { player.fetchLyricsForSong(it) }
     }
+
+    fun setShowSettings(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showSettings = show)
+    }
+
+    fun setShowCarMode(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showCarMode = show)
+    }
+
+    fun setEditingSongTags(song: Song?) {
+        _uiState.value = _uiState.value.copy(editingSongTags = song)
+    }
+
+    fun saveSongTags(updatedSong: Song) {
+        viewModelScope.launch {
+            repository.updateSong(updatedSong)
+            player.updateCurrentSongMetadata(updatedSong)
+            _uiState.value = _uiState.value.copy(
+                editingSongTags = null,
+                scanResultMsg = getApplication<Application>().getString(com.example.R.string.tags_updated_msg, updatedSong.title)
+            )
+        }
+    }
+
+    fun toggleCarModeAutoLaunch() {
+        val newVal = !prefs.isCarModeAutoLaunchEnabled
+        prefs.isCarModeAutoLaunchEnabled = newVal
+        _uiState.value = _uiState.value.copy(isCarModeAutoLaunch = newVal)
+    }
+
+    fun toggleLyricsTranslation() {
+        val newVal = !prefs.isLyricsTranslationEnabled
+        prefs.isLyricsTranslationEnabled = newVal
+        _uiState.value = _uiState.value.copy(isLyricsTranslation = newVal)
+        if (newVal) {
+            translateLyrics(prefs.targetTranslationLanguage)
+        }
+    }
+
+    fun setTargetLanguage(lang: String) {
+        prefs.targetTranslationLanguage = lang
+        _uiState.value = _uiState.value.copy(targetLanguage = lang)
+        translateLyrics(lang)
+    }
+
+    fun setABLoopStart() = player.setABLoopStart()
+    fun setABLoopEnd() = player.setABLoopEnd()
+    fun clearABLoop() = player.clearABLoop()
+    fun restartCurrentSong() = player.restartCurrentSong()
 
     fun translateLyrics(targetLang: String) {
         player.translateCurrentLyrics(targetLang)
@@ -277,6 +384,56 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun clearScanMessage() {
         _uiState.value = _uiState.value.copy(scanResultMsg = null)
+    }
+
+    fun setSortOrder(order: com.example.data.model.SongSortOrder) {
+        _uiState.value = _uiState.value.copy(sortOrder = order)
+    }
+
+    fun setSelectedFolder(folder: String?) {
+        _uiState.value = _uiState.value.copy(selectedFolder = folder)
+    }
+
+    fun toggleSelectionMode(enabled: Boolean? = null) {
+        val next = enabled ?: !_uiState.value.isSelectionMode
+        _uiState.value = _uiState.value.copy(
+            isSelectionMode = next,
+            selectedSongIds = if (next) _uiState.value.selectedSongIds else emptySet()
+        )
+    }
+
+    fun toggleSongSelection(songId: Long) {
+        val current = _uiState.value.selectedSongIds
+        val next = if (current.contains(songId)) current - songId else current + songId
+        _uiState.value = _uiState.value.copy(selectedSongIds = next)
+    }
+
+    fun selectAllSongs(songs: List<Song>) {
+        _uiState.value = _uiState.value.copy(selectedSongIds = songs.map { it.id }.toSet())
+    }
+
+    fun clearSongSelection() {
+        _uiState.value = _uiState.value.copy(selectedSongIds = emptySet())
+    }
+
+    fun playSelectedSongs() {
+        val selected = allSongs.value.filter { _uiState.value.selectedSongIds.contains(it.id) }
+        if (selected.isNotEmpty()) {
+            player.currentPlaylist = selected
+            player.playSong(selected.first())
+            toggleSelectionMode(false)
+        }
+    }
+
+    fun deleteSelectedSongs() {
+        val selectedIds = _uiState.value.selectedSongIds
+        viewModelScope.launch {
+            val toDelete = allSongs.value.filter { selectedIds.contains(it.id) }
+            toDelete.forEach { song ->
+                repository.deleteSong(song)
+            }
+            toggleSelectionMode(false)
+        }
     }
 
     override fun onCleared() {

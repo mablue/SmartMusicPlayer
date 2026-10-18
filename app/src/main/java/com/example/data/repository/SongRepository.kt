@@ -186,21 +186,48 @@ class SongRepository(
                         }
                     } else "Music"
 
-                    // Low-cost heuristic language & genre detection
+                    // Intelligent low-cost heuristic language & category detection
+                    val combinedText = "$title $artist $album $folderName".lowercase()
+                    val hasPersianChars = Regex("[\u0600-\u06FF]").containsMatchIn(combinedText)
+                    val persianTranslitKeywords = listOf(
+                        "chavoshi", "shajarian", "shadmehr", "ebi", "dariush", "sattar", "moein",
+                        "hayedeh", "mahasti", "googoosh", "sirvan", "xaniar", "yasin", "yeganeh",
+                        "alireza", "ghomayshi", "behnam", "reza", "mohammad", "ali", "sorena",
+                        "hichkas", "yas", "shayea", "pishro", "bahram", "zedbazi", "leito",
+                        "khalsi", "tohi", "arash", "sasy", "homayoun", "farhad", "fereydoun",
+                        "macan", "evan", "hoorosh", "puzzle", "masih", "arash ap", "meysam",
+                        "ebrahimi", "ahmadvand", "persian", "irani", "farsi", "sonati", "ahang"
+                    )
+                    val hasPersianKeyword = persianTranslitKeywords.any { combinedText.contains(it) }
+
                     val detectedLang = when {
-                        Regex("[\u0600-\u06FF]").containsMatchIn("$title $artist $album") -> "Persian"
-                        Regex("[a-zA-Z]").containsMatchIn("$title $artist") -> "English"
+                        hasPersianChars || hasPersianKeyword -> "Persian"
+                        Regex("""[çğıöşüÇĞİÖŞÜ]""").containsMatchIn(combinedText) || combinedText.contains("turkish") -> "Turkish"
+                        Regex("""[\u0400-\u04FF]""").containsMatchIn(combinedText) -> "Russian"
+                        Regex("""[éèêëàâîïôûùç]""").containsMatchIn(combinedText) -> "French"
+                        Regex("""[a-zA-Z]""").containsMatchIn(combinedText) -> "English"
                         else -> "Instrumental"
                     }
 
+                    val isPodcastDetect = duration > 10 * 60 * 1000L ||
+                            combinedText.contains("podcast") || combinedText.contains("پادکست") ||
+                            combinedText.contains("castbox") || combinedText.contains("shenoto") ||
+                            combinedText.contains("episode") || combinedText.contains("قسمت") ||
+                            combinedText.contains("channelb") || combinedText.contains("radio")
+                    val isAudiobookDetect = combinedText.contains("audiobook") || combinedText.contains("کتاب") ||
+                            combinedText.contains("گویا") || combinedText.contains("ketab") ||
+                            combinedText.contains("فصل") || combinedText.contains("chapter")
+
                     val detectedGenre = when {
-                        folderName.contains("rock", ignoreCase = true) || title.contains("rock", ignoreCase = true) -> "Rock"
-                        folderName.contains("pop", ignoreCase = true) || title.contains("pop", ignoreCase = true) -> "Pop"
-                        folderName.contains("electro", ignoreCase = true) || folderName.contains("edm", ignoreCase = true) || title.contains("remix", ignoreCase = true) -> "Electronic"
-                        folderName.contains("rap", ignoreCase = true) || folderName.contains("hip", ignoreCase = true) -> "Hip-Hop"
-                        folderName.contains("traditional", ignoreCase = true) || folderName.contains("sonati", ignoreCase = true) -> "Traditional"
-                        folderName.contains("jazz", ignoreCase = true) -> "Jazz"
-                        folderName.contains("classic", ignoreCase = true) -> "Classical"
+                        isAudiobookDetect -> "Audiobook"
+                        isPodcastDetect -> "Podcast"
+                        folderName.contains("rock", ignoreCase = true) || combinedText.contains("rock") -> "Rock"
+                        folderName.contains("pop", ignoreCase = true) || combinedText.contains("pop") -> "Pop"
+                        folderName.contains("electro", ignoreCase = true) || folderName.contains("edm", ignoreCase = true) || combinedText.contains("remix") -> "Electronic"
+                        folderName.contains("rap", ignoreCase = true) || combinedText.contains("hip-hop") || combinedText.contains("hip hop") -> "Hip-Hop"
+                        folderName.contains("traditional", ignoreCase = true) || combinedText.contains("sonati") || combinedText.contains("سنتی") -> "Traditional"
+                        folderName.contains("jazz", ignoreCase = true) || combinedText.contains("jazz") -> "Jazz"
+                        folderName.contains("classic", ignoreCase = true) || combinedText.contains("classic") -> "Classical"
                         else -> "Music"
                     }
 

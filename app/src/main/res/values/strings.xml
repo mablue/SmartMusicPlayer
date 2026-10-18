@@ -3,7 +3,8 @@
     <string name="app_subtitle">Adaptive Ranking &amp; Smart Shuffle</string>
 
     <!-- Navigation Tabs -->
-    <string name="tab_library">Library</string>
+    <string name="tab_library">Music</string>
+    <string name="tab_podcasts">Podcasts</string>
     <string name="tab_rankings">Rankings</string>
     <string name="tab_discovery">Discovery</string>
     <string name="tab_analytics">Analytics</string>
@@ -11,6 +12,14 @@
     <!-- Search & Filter -->
     <string name="search_hint">Search title, artist, or album…</string>
     <string name="filter_all">All</string>
+    <string name="folder_all">All Folders</string>
+    <string name="btn_sort">Sort</string>
+    <string name="btn_select_mode">Select</string>
+    <string name="btn_select_all">Select All</string>
+    <string name="btn_play_selected">Play Selected (%d)</string>
+    <string name="btn_delete_selected">Delete (%d)</string>
+    <string name="podcasts_empty_title">No Podcasts or Audiobooks Found</string>
+    <string name="podcasts_empty_desc">Audio files longer than 10 minutes or located in Podcast/Audiobook folders will appear here with dedicated chapter &amp; resume controls.</string>
     <string name="no_filtered_songs">No songs found matching this filter</string>
 
     <!-- Tiers -->
@@ -152,4 +161,31 @@
     <string name="ab_loop_set_b">Set B</string>
     <string name="ab_loop_clear">Clear</string>
     <string name="ab_loop_active">Loop: %1$s ➜ %2$s</string>
+    <!-- Tag Editing, Sharing & Settings -->
+    <string name="edit_tags_title">Edit Track Tags</string>
+    <string name="edit_tags_title_label">Song Title</string>
+    <string name="edit_tags_artist_label">Artist / Channel</string>
+    <string name="edit_tags_album_label">Album / Series</string>
+    <string name="edit_tags_genre_label">Genre</string>
+    <string name="edit_tags_lang_label">Language</string>
+    <string name="action_share_song">Share Track</string>
+    <string name="action_edit_tags">Edit Tags</string>
+    <string name="action_settings">Settings</string>
+    <string name="settings_title">Player Settings</string>
+    <string name="settings_sec_playback">PLAYBACK &amp; AUTOMATION</string>
+    <string name="settings_bt_autoplay_title">Bluetooth Auto-Play</string>
+    <string name="settings_bt_autoplay_sub">Resume playing when headphones or car audio connects</string>
+    <string name="settings_car_mode_title">Auto Car Mode</string>
+    <string name="settings_car_mode_sub">Launch driving HUD when connected to car Bluetooth</string>
+    <string name="settings_sec_lyrics">LYRICS &amp; AI TRANSLATION</string>
+    <string name="settings_lyrics_trans_title">Auto-Translate Lyrics</string>
+    <string name="settings_lyrics_trans_sub">Translate synced lyrics in real-time</string>
+    <string name="settings_target_lang">Target Translation Language</string>
+    <string name="settings_sec_library">LIBRARY &amp; RANKING ENGINE</string>
+    <string name="settings_rescan_btn">Scan Storage for Music</string>
+    <string name="settings_reset_ranks_btn">Reset All Adaptive Ranks &amp; Scores</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_change">Change</string>
+    <string name="btn_done">Done</string>
+    <string name="tags_updated_msg">Tags updated for «%s»</string>
 </resources>

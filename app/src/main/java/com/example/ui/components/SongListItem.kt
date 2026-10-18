@@ -17,18 +17,29 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -57,6 +68,11 @@ fun SongListItem(
     onSongClick: () -> Unit,
     onInfoClick: () -> Unit,
     onDeleteClick: () -> Unit,
+    onEditTagsClick: (() -> Unit)? = null,
+    onShareClick: (() -> Unit)? = null,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelect: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val tierColor = when (song.rankTier) {
@@ -67,17 +83,27 @@ fun SongListItem(
         RankTier.DISLIKED -> NeonRose
     }
 
-    val containerColor = if (isCurrentSong) DarkSurfaceVariant else DarkSurface
-    val borderColor = if (isCurrentSong) tierColor.copy(alpha = 0.8f) else DarkSurfaceBorder.copy(alpha = 0.4f)
+    val containerColor = when {
+        isSelected -> NeonCyan.copy(alpha = 0.18f)
+        isCurrentSong -> DarkSurfaceVariant
+        else -> DarkSurface
+    }
+    val borderColor = when {
+        isSelected -> NeonCyan
+        isCurrentSong -> tierColor.copy(alpha = 0.8f)
+        else -> DarkSurfaceBorder.copy(alpha = 0.4f)
+    }
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onSongClick)
+            .clickable(onClick = {
+                if (isSelectionMode && onToggleSelect != null) onToggleSelect() else onSongClick()
+            })
             .testTag("song_item_${song.id}"),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        border = BorderStroke(if (isCurrentSong) 1.dp else 0.5.dp, borderColor)
+        border = BorderStroke(if (isCurrentSong || isSelected) 1.dp else 0.5.dp, borderColor)
     ) {
         Row(
             modifier = Modifier
@@ -85,6 +111,18 @@ fun SongListItem(
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (isSelectionMode) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelect?.invoke() },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = NeonCyan,
+                        uncheckedColor = Color(0xFF94A3B8)
+                    ),
+                    modifier = Modifier.padding(end = 6.dp)
+                )
+            }
+
             // Compact Thumbnail / Icon (36dp)
             Surface(
                 shape = RoundedCornerShape(8.dp),
@@ -148,6 +186,21 @@ fun SongListItem(
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }
+                    if (song.hasResumePosition) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = NeonCyan.copy(alpha = 0.2f),
+                            border = BorderStroke(0.5.dp, NeonCyan.copy(alpha = 0.8f))
+                        ) {
+                            Text(
+                                text = "⏱️ ${song.formattedResumePosition}",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NeonCyan,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(2.dp))
@@ -198,37 +251,83 @@ fun SongListItem(
                 }
             }
 
-            // Compact Action Buttons: Delete, Info, Play
+            // Compact Action Buttons: Options Menu, Play/Pause
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(0.dp)
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                // Delete Button (compact)
-                IconButton(
-                    onClick = onDeleteClick,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .testTag("delete_song_${song.id}")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DeleteOutline,
-                        contentDescription = androidx.compose.ui.res.stringResource(com.example.R.string.action_delete_song),
-                        tint = NeonRose.copy(alpha = 0.75f),
-                        modifier = Modifier.size(17.dp)
-                    )
-                }
+                var showMenu by remember { mutableStateOf(false) }
 
-                // Info Button (compact)
-                IconButton(
-                    onClick = onInfoClick,
-                    modifier = Modifier.size(30.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = androidx.compose.ui.res.stringResource(com.example.R.string.action_rank_details),
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(17.dp)
-                    )
+                Box {
+                    IconButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "More Options",
+                            tint = Color(0xFF94A3B8),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.background(DarkSurfaceVariant)
+                    ) {
+                        // Edit Tags
+                        if (onEditTagsClick != null) {
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(Icons.Default.Edit, contentDescription = null, tint = NeonAmber, modifier = Modifier.size(18.dp))
+                                },
+                                text = { Text(androidx.compose.ui.res.stringResource(com.example.R.string.action_edit_tags), color = Color.White) },
+                                onClick = {
+                                    showMenu = false
+                                    onEditTagsClick()
+                                }
+                            )
+                        }
+
+                        // Share Track
+                        if (onShareClick != null) {
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(Icons.Default.Share, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
+                                },
+                                text = { Text(androidx.compose.ui.res.stringResource(com.example.R.string.action_share_song), color = Color.White) },
+                                onClick = {
+                                    showMenu = false
+                                    onShareClick()
+                                }
+                            )
+                        }
+
+                        // Info / Rank details
+                        DropdownMenuItem(
+                            leadingIcon = {
+                                Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFF818CF8), modifier = Modifier.size(18.dp))
+                            },
+                            text = { Text(androidx.compose.ui.res.stringResource(com.example.R.string.action_rank_details), color = Color.White) },
+                            onClick = {
+                                showMenu = false
+                                onInfoClick()
+                            }
+                        )
+
+                        // Delete Song
+                        DropdownMenuItem(
+                            leadingIcon = {
+                                Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = NeonRose, modifier = Modifier.size(18.dp))
+                            },
+                            text = { Text(androidx.compose.ui.res.stringResource(com.example.R.string.action_delete_song), color = NeonRose) },
+                            onClick = {
+                                showMenu = false
+                                onDeleteClick()
+                            }
+                        )
+                    }
                 }
 
                 // Play / Pause Button (compact)

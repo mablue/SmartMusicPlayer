@@ -32,15 +32,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Star
+import com.example.data.model.SongSortOrder
+import com.example.ui.components.PodcastsTabContent
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -82,12 +88,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.data.model.RankTier
 import com.example.data.model.Song
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.platform.LocalContext
 import com.example.ui.components.AlgorithmInspectorDialog
 import com.example.ui.components.AnalyticsTab
+import com.example.ui.components.CarModeDialog
+import com.example.ui.components.EditSongTagsDialog
 import com.example.ui.components.EvaluationBanner
 import com.example.ui.components.FullPlayerContent
 import com.example.ui.components.LyricsViewDialog
 import com.example.ui.components.MiniPlayerBar
+import com.example.ui.components.SettingsDialog
 import com.example.ui.components.SongListItem
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
@@ -100,6 +111,7 @@ import com.example.ui.theme.NeonRose
 import com.example.ui.theme.NeonViolet
 import com.example.ui.viewmodel.AppTab
 import com.example.ui.viewmodel.MusicPlayerViewModel
+import com.example.util.SongShareHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -112,6 +124,8 @@ fun HomeScreen(
     val rankedSongs by viewModel.rankedSongs.collectAsStateWithLifecycle()
     val unplayedSongs by viewModel.unplayedSongs.collectAsStateWithLifecycle()
     val filteredLibrarySongs by viewModel.filteredLibrarySongs.collectAsStateWithLifecycle()
+    val podcastAndAudiobooks by viewModel.podcastAndAudiobooks.collectAsStateWithLifecycle()
+    val availableFolders by viewModel.availableFolders.collectAsStateWithLifecycle()
 
     val isPlaying by viewModel.player.isPlaying.collectAsStateWithLifecycle()
     val currentSong by viewModel.player.currentSong.collectAsStateWithLifecycle()
@@ -121,7 +135,11 @@ fun HomeScreen(
     val lastEvaluation by viewModel.player.lastEvaluation.collectAsStateWithLifecycle()
     val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
     val sleepTimerMinutes by viewModel.sleepTimerMinutes.collectAsStateWithLifecycle()
+    val abLoopActive by viewModel.abLoopActive.collectAsStateWithLifecycle()
+    val abLoopStartMs by viewModel.abLoopStartMs.collectAsStateWithLifecycle()
+    val abLoopEndMs by viewModel.abLoopEndMs.collectAsStateWithLifecycle()
 
+    val context = LocalContext.current
     var showGeneralInfoDialog by remember { mutableStateOf(false) }
 
     // Media permission for scanning device audio
@@ -192,7 +210,17 @@ fun HomeScreen(
             onSpeedChange = { viewModel.setPlaybackSpeed(it) },
             sleepTimerMinutes = sleepTimerMinutes,
             onSleepTimerChange = { viewModel.setSleepTimer(it) },
-            onSeekRelative = { viewModel.seekRelative(it) }
+            onSeekRelative = { viewModel.seekRelative(it) },
+            onShareClick = { currentSong?.let { SongShareHelper.shareSong(context, it) } },
+            onEditTagsClick = { currentSong?.let { viewModel.setEditingSongTags(it) } },
+            onCarModeClick = { viewModel.setShowCarMode(true) },
+            onRestartFromBeginning = { viewModel.restartCurrentSong() },
+            isABLoopActive = abLoopActive,
+            abLoopStartMs = abLoopStartMs,
+            abLoopEndMs = abLoopEndMs,
+            onSetABLoopStart = { viewModel.setABLoopStart() },
+            onSetABLoopEnd = { viewModel.setABLoopEnd() },
+            onClearABLoop = { viewModel.clearABLoop() }
         )
     } else {
         Scaffold(
@@ -270,6 +298,18 @@ fun HomeScreen(
                                 tint = Color.White.copy(alpha = 0.85f)
                             )
                         }
+
+                        // Settings Button
+                        IconButton(
+                            onClick = { viewModel.setShowSettings(true) },
+                            modifier = Modifier.testTag("settings_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.settings_title),
+                                tint = Color.White.copy(alpha = 0.85f)
+                            )
+                        }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = DarkBackground
@@ -311,6 +351,20 @@ fun HomeScreen(
                                 selectedIconColor = Color.Black,
                                 indicatorColor = NeonCyan,
                                 selectedTextColor = NeonCyan,
+                                unselectedIconColor = Color(0xFF94A3B8),
+                                unselectedTextColor = Color(0xFF94A3B8)
+                            )
+                        )
+
+                        NavigationBarItem(
+                            selected = uiState.selectedTab == AppTab.PODCASTS,
+                            onClick = { viewModel.setSelectedTab(AppTab.PODCASTS) },
+                            icon = { Icon(Icons.Default.Headphones, contentDescription = stringResource(R.string.tab_podcasts)) },
+                            label = { Text(stringResource(R.string.tab_podcasts), fontSize = 11.sp) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Color.Black,
+                                indicatorColor = ElectricBlue,
+                                selectedTextColor = ElectricBlue,
                                 unselectedIconColor = Color(0xFF94A3B8),
                                 unselectedTextColor = Color(0xFF94A3B8)
                             )
@@ -436,7 +490,9 @@ fun HomeScreen(
                                     onTierSelect = { viewModel.setTierFilter(it) },
                                     onSongClick = { viewModel.playSong(it) },
                                     onInfoClick = { viewModel.setInspectingSong(it) },
-                                    onDeleteClick = { viewModel.requestDeleteSong(it) }
+                                    onDeleteClick = { viewModel.requestDeleteSong(it) },
+                                    onEditTagsClick = { viewModel.setEditingSongTags(it) },
+                                    onShareClick = { SongShareHelper.shareSong(context, it) }
                                 )
                             }
 
@@ -447,7 +503,9 @@ fun HomeScreen(
                                     isPlaying = isPlaying,
                                     onSongClick = { viewModel.playSong(it) },
                                     onInfoClick = { viewModel.setInspectingSong(it) },
-                                    onDeleteClick = { viewModel.requestDeleteSong(it) }
+                                    onDeleteClick = { viewModel.requestDeleteSong(it) },
+                                    onEditTagsClick = { viewModel.setEditingSongTags(it) },
+                                    onShareClick = { SongShareHelper.shareSong(context, it) }
                                 )
                             }
 
@@ -458,7 +516,9 @@ fun HomeScreen(
                                     isPlaying = isPlaying,
                                     onSongClick = { viewModel.playSong(it) },
                                     onInfoClick = { viewModel.setInspectingSong(it) },
-                                    onDeleteClick = { viewModel.requestDeleteSong(it) }
+                                    onDeleteClick = { viewModel.requestDeleteSong(it) },
+                                    onEditTagsClick = { viewModel.setEditingSongTags(it) },
+                                    onShareClick = { SongShareHelper.shareSong(context, it) }
                                 )
                             }
 
@@ -550,6 +610,53 @@ fun HomeScreen(
             onRetryFetch = { viewModel.fetchLyricsForCurrent() },
             onTranslate = { targetLang -> viewModel.translateLyrics(targetLang) },
             onDismiss = { viewModel.setShowLyricsSheet(false) }
+        )
+    }
+
+    // Edit Song Tags Dialog
+    uiState.editingSongTags?.let { song ->
+        EditSongTagsDialog(
+            song = song,
+            onSave = { updated -> viewModel.saveSongTags(updated) },
+            onDismiss = { viewModel.setEditingSongTags(null) }
+        )
+    }
+
+    // App Settings Dialog
+    if (uiState.showSettings) {
+        SettingsDialog(
+            isBluetoothAutoPlay = uiState.isBluetoothAutoPlay,
+            onToggleBluetoothAutoPlay = { viewModel.toggleBluetoothAutoPlay() },
+            isCarModeAutoLaunch = uiState.isCarModeAutoLaunch,
+            onToggleCarModeAutoLaunch = { viewModel.toggleCarModeAutoLaunch() },
+            isLyricsTranslation = uiState.isLyricsTranslation,
+            onToggleLyricsTranslation = { viewModel.toggleLyricsTranslation() },
+            targetLanguage = uiState.targetLanguage,
+            onSelectTargetLanguage = { viewModel.setTargetLanguage(it) },
+            onRescanStorage = {
+                viewModel.setShowSettings(false)
+                permissionLauncher.launch(permissionToRequest)
+            },
+            onResetScores = {
+                viewModel.setShowSettings(false)
+                viewModel.resetAllScores()
+            },
+            onDismiss = { viewModel.setShowSettings(false) }
+        )
+    }
+
+    // Driving Car Mode Dialog
+    if (uiState.showCarMode) {
+        CarModeDialog(
+            song = currentSong,
+            isPlaying = isPlaying,
+            currentPositionMs = currentPositionMs,
+            durationMs = durationMs,
+            onTogglePlayPause = { viewModel.togglePlayPause() },
+            onSkipNext = { viewModel.skipNext() },
+            onSkipPrevious = { viewModel.skipPrevious() },
+            onSeekRelative = { viewModel.seekRelative(it) },
+            onDismiss = { viewModel.setShowCarMode(false) }
         )
     }
 }
@@ -646,7 +753,9 @@ private fun LibraryTabContent(
     onTierSelect: (RankTier?) -> Unit,
     onSongClick: (Song) -> Unit,
     onInfoClick: (Song) -> Unit,
-    onDeleteClick: (Song) -> Unit
+    onDeleteClick: (Song) -> Unit,
+    onEditTagsClick: (Song) -> Unit,
+    onShareClick: (Song) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Search & Filter Row
@@ -760,7 +869,9 @@ private fun LibraryTabContent(
                         isPlaying = isPlaying,
                         onSongClick = { onSongClick(song) },
                         onInfoClick = { onInfoClick(song) },
-                        onDeleteClick = { onDeleteClick(song) }
+                        onDeleteClick = { onDeleteClick(song) },
+                        onEditTagsClick = { onEditTagsClick(song) },
+                        onShareClick = { onShareClick(song) }
                     )
                 }
                 item {
@@ -778,7 +889,9 @@ private fun RankingsTabContent(
     isPlaying: Boolean,
     onSongClick: (Song) -> Unit,
     onInfoClick: (Song) -> Unit,
-    onDeleteClick: (Song) -> Unit
+    onDeleteClick: (Song) -> Unit,
+    onEditTagsClick: (Song) -> Unit,
+    onShareClick: (Song) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -854,7 +967,9 @@ private fun RankingsTabContent(
                         isPlaying = isPlaying,
                         onSongClick = { onSongClick(song) },
                         onInfoClick = { onInfoClick(song) },
-                        onDeleteClick = { onDeleteClick(song) }
+                        onDeleteClick = { onDeleteClick(song) },
+                        onEditTagsClick = { onEditTagsClick(song) },
+                        onShareClick = { onShareClick(song) }
                     )
                 }
             }
@@ -873,7 +988,9 @@ private fun DiscoveryTabContent(
     isPlaying: Boolean,
     onSongClick: (Song) -> Unit,
     onInfoClick: (Song) -> Unit,
-    onDeleteClick: (Song) -> Unit
+    onDeleteClick: (Song) -> Unit,
+    onEditTagsClick: (Song) -> Unit,
+    onShareClick: (Song) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -947,7 +1064,9 @@ private fun DiscoveryTabContent(
                     isPlaying = isPlaying,
                     onSongClick = { onSongClick(song) },
                     onInfoClick = { onInfoClick(song) },
-                    onDeleteClick = { onDeleteClick(song) }
+                    onDeleteClick = { onDeleteClick(song) },
+                    onEditTagsClick = { onEditTagsClick(song) },
+                    onShareClick = { onShareClick(song) }
                 )
             }
         }

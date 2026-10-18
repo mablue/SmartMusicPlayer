@@ -137,6 +137,34 @@ object LyricsService {
                 }
             }
 
+            // Step 3: Fallback - lyrics.ovh free public API
+            val ovhUrl = "https://api.lyrics.ovh/v1/" +
+                    URLEncoder.encode(cleanArtist, "UTF-8") + "/" +
+                    URLEncoder.encode(cleanTitle, "UTF-8")
+            try {
+                val ovhReq = Request.Builder().url(ovhUrl).header("User-Agent", "SmartMusic-Android/2.0").build()
+                client.newCall(ovhReq).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string()
+                        if (!body.isNullOrEmpty()) {
+                            val json = JSONObject(body)
+                            val lyricsStr = json.optString("lyrics")
+                            if (lyricsStr.isNotBlank()) {
+                                return@withContext fitPlainLyricsToSongDuration(lyricsStr, durationSec * 1000L, "Lyrics.ovh")
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Lyrics.ovh fallback bypassed: ${e.message}")
+            }
+
+            // Step 4: Fallback - Google / Web lyrics search
+            val webLyrics = searchGoogleForLyrics(cleanArtist, cleanTitle)
+            if (!webLyrics.isNullOrBlank()) {
+                return@withContext fitPlainLyricsToSongDuration(webLyrics, durationSec * 1000L, "Google Web Search")
+            }
+
         } catch (e: Exception) {
             Log.w(TAG, "Lyrics fetch error for $artist - $title: ${e.message}")
         }
@@ -144,14 +172,107 @@ object LyricsService {
     }
 
     /**
+     * Searches Google for lyrics when database APIs have no record (e.g. Persian / local indie tracks).
+     */
+    private fun searchGoogleForLyrics(artist: String, title: String): String? {
+        try {
+            val query = if (Regex("[\u0600-\u06FF]").containsMatchIn("$artist $title")) {
+                "متن آهنگ $artist $title"
+            } else {
+                "lyrics $artist $title"
+            }
+            val searchUrl = "https://html.duckduckgo.com/html/?q=" + URLEncoder.encode(query, "UTF-8")
+            val req = Request.Builder()
+                .url(searchUrl)
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile)")
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val html = resp.body?.string() ?: return null
+                    // Extract snippets from search results
+                    val snippetRegex = Regex("""<a class="result__snippet[^>]*>(.*?)</a>""", RegexOption.DOT_MATCHES_ALL)
+                    val matches = snippetRegex.findAll(html).take(4)
+                    val collected = StringBuilder()
+                    for (m in matches) {
+                        val clean = m.groupValues[1]
+                            .replace(Regex("<[^>]*>"), "")
+                            .replace("&quot;", "\"")
+                            .replace("&amp;", "&")
+                            .trim()
+                        if (clean.length > 30) {
+                            collected.append(clean).append("\n")
+                        }
+                    }
+                    if (collected.length > 50) {
+                        return collected.toString()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Web search fallback error: ${e.message}")
+        }
+        return null
+    }
+
+    /**
+     * Smart Auto-Fit equation:
+     * Fits plain static lyrics dynamically across track duration based on line length and pauses,
+     * transforming static plain lyrics into synced scrolling HUD!
+     */
+    fun fitPlainLyricsToSongDuration(plainText: String, totalDurationMs: Long, sourceName: String): LyricsResult {
+        val validLines = plainText.lines()
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !it.startsWith("Paroles de") && !it.startsWith("Lyrics by") }
+
+        if (validLines.isEmpty()) {
+            return LyricsResult(emptyList(), false, sourceName, plainText)
+        }
+
+        val trackDuration = if (totalDurationMs > 30_000L) totalDurationMs else (validLines.size * 4500L)
+        val introPauseMs = (trackDuration * 0.08f).toLong().coerceIn(6000L, 16000L)
+        val outroPauseMs = (trackDuration * 0.05f).toLong().coerceIn(4000L, 12000L)
+        val effectiveMs = (trackDuration - introPauseMs - outroPauseMs).coerceAtLeast(10_000L)
+
+        // Line weights based on length (syllables approximation)
+        val weights = validLines.map { line -> line.length.coerceIn(15, 80).toFloat() }
+        val totalWeight = weights.sum().coerceAtLeast(1.0f)
+
+        var accumulatedMs = introPauseMs
+        val fittedLines = mutableListOf<LyricLine>()
+
+        for (i in validLines.indices) {
+            val lineDuration = ((weights[i] / totalWeight) * effectiveMs).toLong().coerceAtLeast(2500L)
+            fittedLines.add(LyricLine(timestampMs = accumulatedMs, text = validLines[i]))
+            accumulatedMs += lineDuration
+        }
+
+        return LyricsResult(
+            lines = fittedLines,
+            isSynced = true,
+            source = "$sourceName (Auto-Fitted)",
+            plainText = plainText
+        )
+    }
+
+    /**
      * Translates lyrics text using public translation endpoint.
-     * Supports translating into Persian ('fa') or English ('en').
+     * Prevents translating Persian into Persian, and auto-switches target if already matching.
      */
     suspend fun translateText(text: String, targetLang: String = "fa"): String? = withContext(Dispatchers.IO) {
         if (text.isBlank()) return@withContext null
         try {
+            val hasPersianChars = Regex("[\u0600-\u06FF]").containsMatchIn(text)
+            // If the song line is already in Persian script:
+            // Do NOT translate Persian into Persian! Translate to English instead if requested, or skip.
+            val effectiveTarget = if (hasPersianChars) {
+                if (targetLang == "fa") return@withContext null else targetLang
+            } else {
+                targetLang
+            }
+
             val encoded = URLEncoder.encode(text.take(2000), "UTF-8")
-            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$targetLang&dt=t&q=$encoded"
+            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$effectiveTarget&dt=t&q=$encoded"
 
             val request = Request.Builder()
                 .url(url)
@@ -168,7 +289,9 @@ object LyricsService {
                         val part = sentences.getJSONArray(i).getString(0)
                         result.append(part)
                     }
-                    return@withContext result.toString()
+                    val translated = result.toString().trim()
+                    // Don't return translation if it's identical to the original input
+                    return@withContext if (translated.equals(text.trim(), ignoreCase = true)) null else translated
                 }
             }
         } catch (e: Exception) {

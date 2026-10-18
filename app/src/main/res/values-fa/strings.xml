@@ -152,4 +152,31 @@
     <string name="ab_loop_set_b">نقطه B</string>
     <string name="ab_loop_clear">حذف تکرار</string>
     <string name="ab_loop_active">تکرار: %1$s ➜ %2$s</string>
+    <!-- Tag Editing, Sharing & Settings -->
+    <string name="edit_tags_title">ویرایش تگ‌های آهنگ</string>
+    <string name="edit_tags_title_label">نام قطعه</string>
+    <string name="edit_tags_artist_label">خواننده / سازنده</string>
+    <string name="edit_tags_album_label">آلبوم / مجموعه</string>
+    <string name="edit_tags_genre_label">ژانر</string>
+    <string name="edit_tags_lang_label">زبان</string>
+    <string name="action_share_song">اشتراک‌گذاری آهنگ</string>
+    <string name="action_edit_tags">ویرایش تگ‌ها</string>
+    <string name="action_settings">تنظیمات</string>
+    <string name="settings_title">تنظیمات برنامه و موتور صوتی</string>
+    <string name="settings_sec_playback">پخش و خودکارسازی بلوتوث</string>
+    <string name="settings_bt_autoplay_title">پخش خودکار با بلوتوث</string>
+    <string name="settings_bt_autoplay_sub">ادامه خودکار پخش با اتصال هدفون یا بلوتوث خودرو</string>
+    <string name="settings_car_mode_title">ورود خودکار به حالت رانندگی</string>
+    <string name="settings_car_mode_sub">باز شدن نمایشگر رانندگی هنگام اتصال به خودرو</string>
+    <string name="settings_sec_lyrics">متن ترانه و ترجمه هوشمند</string>
+    <string name="settings_lyrics_trans_title">ترجمه خودکار متن آهنگ</string>
+    <string name="settings_lyrics_trans_sub">ترجمه همگام و زنده متن لیریکس</string>
+    <string name="settings_target_lang">زبان مقصد ترجمه</string>
+    <string name="settings_sec_library">کتابخانه و موتور رتبه‌بندی</string>
+    <string name="settings_rescan_btn">اسکن مجدد فایل‌های صوتی دستگاه</string>
+    <string name="settings_reset_ranks_btn">ریست تمامی امتیازات و رتبه‌های هوشمند</string>
+    <string name="btn_save">ذخیره</string>
+    <string name="btn_change">تغییر</string>
+    <string name="btn_done">تأیید</string>
+    <string name="tags_updated_msg">تگ‌های قطعه «%s» بروزرسانی شدند</string>
 </resources>

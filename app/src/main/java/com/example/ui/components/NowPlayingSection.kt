@@ -38,6 +38,11 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothConnected
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.ButtonDefaults
@@ -109,11 +114,22 @@ fun FullPlayerContent(
     sleepTimerMinutes: Int = 0,
     onSleepTimerChange: (Int) -> Unit = {},
     onSeekRelative: (Long) -> Unit = {},
+    onShareClick: (() -> Unit)? = null,
+    onEditTagsClick: (() -> Unit)? = null,
+    onCarModeClick: (() -> Unit)? = null,
+    onRestartFromBeginning: (() -> Unit)? = null,
+    isABLoopActive: Boolean = false,
+    abLoopStartMs: Long? = null,
+    abLoopEndMs: Long? = null,
+    onSetABLoopStart: (() -> Unit)? = null,
+    onSetABLoopEnd: (() -> Unit)? = null,
+    onClearABLoop: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showModeMenu by remember { mutableStateOf(false) }
     var showSpeedMenu by remember { mutableStateOf(false) }
     var showSleepMenu by remember { mutableStateOf(false) }
+    var showABLoopMenu by remember { mutableStateOf(false) }
 
     val safeDuration = durationMs.coerceAtLeast(song?.durationMs ?: 180000L).coerceAtLeast(1000L)
     val progressFraction = (currentPositionMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
@@ -137,8 +153,7 @@ fun FullPlayerContent(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top Bar: Minimize handle / button, Title, Bluetooth, Lyrics, Info, Delete
-        // Generous vertical spacing prevents overlapping notification bar & notch
+        // Top Bar: Minimize handle / button, Title, Car Mode, Share, Edit, Bluetooth, Lyrics, Info, Delete
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -149,14 +164,14 @@ fun FullPlayerContent(
             IconButton(
                 onClick = onCollapse,
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(40.dp)
                     .testTag("full_player_collapse")
             ) {
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
                     contentDescription = stringResource(R.string.btn_collapse),
                     tint = Color.White,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(30.dp)
                 )
             }
 
@@ -169,19 +184,49 @@ fun FullPlayerContent(
             )
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Bluetooth AutoPlay Toggle
-                IconButton(
-                    onClick = onToggleBluetoothAutoPlay,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .testTag("full_player_bluetooth")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.BluetoothConnected,
-                        contentDescription = if (isBluetoothAutoPlay) stringResource(R.string.bluetooth_autoplay_active) else stringResource(R.string.bluetooth_autoplay_inactive),
-                        tint = if (isBluetoothAutoPlay) NeonCyan else Color(0xFF64748B),
-                        modifier = Modifier.size(22.dp)
-                    )
+                // Car Driving Mode Button
+                if (onCarModeClick != null) {
+                    IconButton(
+                        onClick = onCarModeClick,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DirectionsCar,
+                            contentDescription = stringResource(R.string.car_mode_title),
+                            tint = NeonAmber,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                // Share Song Button
+                if (song != null && onShareClick != null) {
+                    IconButton(
+                        onClick = onShareClick,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = stringResource(R.string.action_share_song),
+                            tint = NeonCyan,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                // Edit Song Tags Button
+                if (song != null && onEditTagsClick != null) {
+                    IconButton(
+                        onClick = onEditTagsClick,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = stringResource(R.string.action_edit_tags),
+                            tint = Color(0xFFFBBF24),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
 
                 if (song != null) {
@@ -189,14 +234,14 @@ fun FullPlayerContent(
                     IconButton(
                         onClick = onLyricsClick,
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(36.dp)
                             .testTag("full_player_lyrics")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Subtitles,
                             contentDescription = stringResource(R.string.action_lyrics),
                             tint = NeonCyan,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
@@ -204,14 +249,14 @@ fun FullPlayerContent(
                     IconButton(
                         onClick = { onDeleteClick(song) },
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(36.dp)
                             .testTag("full_player_delete")
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,
                             contentDescription = stringResource(R.string.action_delete_song),
                             tint = NeonRose,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -220,14 +265,14 @@ fun FullPlayerContent(
                 IconButton(
                     onClick = onInfoClick,
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(36.dp)
                         .testTag("full_player_info")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = stringResource(R.string.action_rank_details),
                         tint = Color.White.copy(alpha = 0.85f),
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -421,7 +466,8 @@ fun FullPlayerContent(
         // Time Row
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             val currentSec = (currentPositionMs / 1000).coerceAtLeast(0)
             val totalSec = (safeDuration / 1000).coerceAtLeast(0)
@@ -432,6 +478,25 @@ fun FullPlayerContent(
                 text = curTimeStr,
                 style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF94A3B8))
             )
+
+            if (currentPositionMs > 5000L && onRestartFromBeginning != null) {
+                Surface(
+                    onClick = onRestartFromBeginning,
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color.White.copy(alpha = 0.08f),
+                    border = BorderStroke(0.5.dp, NeonCyan.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Icon(Icons.Default.RestartAlt, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(13.dp))
+                        Text(stringResource(R.string.action_restart_beginning), fontSize = 10.sp, color = NeonCyan)
+                    }
+                }
+            }
+
             Text(
                 text = totTimeStr,
                 style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF94A3B8))
@@ -613,11 +678,73 @@ fun FullPlayerContent(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // A-B Repeat Loop Chip with Dropdown
+            Box {
+                Surface(
+                    onClick = { showABLoopMenu = true },
+                    shape = RoundedCornerShape(12.dp),
+                    color = DarkSurfaceVariant,
+                    border = BorderStroke(1.dp, if (isABLoopActive) Color(0xFFF472B6) else DarkSurfaceBorder)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Repeat,
+                            contentDescription = null,
+                            tint = if (isABLoopActive) Color(0xFFF472B6) else Color(0xFF94A3B8),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = if (isABLoopActive) "A-B ON" else "A-B",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = if (isABLoopActive) Color(0xFFF472B6) else Color(0xFFCBD5E1)
+                            )
+                        )
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = showABLoopMenu,
+                    onDismissRequest = { showABLoopMenu = false },
+                    modifier = Modifier.background(DarkSurfaceVariant)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.ab_loop_set_a), color = Color.White) },
+                        onClick = {
+                            onSetABLoopStart?.invoke()
+                            showABLoopMenu = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.ab_loop_set_b), color = Color.White) },
+                        onClick = {
+                            onSetABLoopEnd?.invoke()
+                            showABLoopMenu = false
+                        }
+                    )
+                    if (isABLoopActive) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.ab_loop_clear), color = NeonRose) },
+                            onClick = {
+                                onClearABLoop?.invoke()
+                                showABLoopMenu = false
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Main Controls: Previous, -10s, Play/Pause, +10s, Next
+        // Main Controls: Previous, -15s, Play/Pause, +15s, Next
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -637,17 +764,20 @@ fun FullPlayerContent(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // -10s Rewind
+            // -15s Rewind
             IconButton(
-                onClick = { onSeekRelative(-10000L) },
+                onClick = { onSeekRelative(-15000L) },
                 modifier = Modifier.size(46.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.FastRewind,
-                    contentDescription = stringResource(R.string.action_rewind_10),
-                    tint = Color(0xFFCBD5E1),
-                    modifier = Modifier.size(24.dp)
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.FastRewind,
+                        contentDescription = stringResource(R.string.action_rewind_15),
+                        tint = Color(0xFFCBD5E1),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text("15s", fontSize = 9.sp, color = Color(0xFF94A3B8))
+                }
             }
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -672,17 +802,20 @@ fun FullPlayerContent(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // +10s Forward
+            // +15s Forward
             IconButton(
-                onClick = { onSeekRelative(10000L) },
+                onClick = { onSeekRelative(15000L) },
                 modifier = Modifier.size(46.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.FastForward,
-                    contentDescription = stringResource(R.string.action_forward_10),
-                    tint = Color(0xFFCBD5E1),
-                    modifier = Modifier.size(24.dp)
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.FastForward,
+                        contentDescription = stringResource(R.string.action_forward_15),
+                        tint = Color(0xFFCBD5E1),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text("15s", fontSize = 9.sp, color = Color(0xFF94A3B8))
+                }
             }
 
             Spacer(modifier = Modifier.width(8.dp))

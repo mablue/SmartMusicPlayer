@@ -24,14 +24,16 @@ object ProceduralAudioGenerator {
         baseFrequency: Double = 440.0,
         durationSeconds: Int = 45
     ): String {
-        val fileName = "smart_song_$songId.wav"
+        val safeDuration = durationSeconds.coerceIn(45, 600)
+        val minBytes = safeDuration.toLong() * SAMPLE_RATE * 2
+        val fileName = "smart_song_${songId}_${safeDuration}s.wav"
         val file = File(context.cacheDir, fileName)
-        if (file.exists() && file.length() > 1000) {
+        if (file.exists() && file.length() >= minBytes) {
             return file.absolutePath
         }
 
         try {
-            val numSamples = SAMPLE_RATE * durationSeconds
+            val numSamples = SAMPLE_RATE * safeDuration
             val audioData = ShortArray(numSamples)
 
             // Musical melody scale notes based on songId

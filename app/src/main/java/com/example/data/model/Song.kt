@@ -83,6 +83,37 @@ data class Song(
 
     val formattedBitrate: String
         get() = if (bitrateKbps > 0) "$bitrateKbps kbps" else "320 kbps HQ"
+
+    val isPodcastOrAudiobook: Boolean
+        get() = genre.equals("Podcast", ignoreCase = true) ||
+                genre.equals("Audiobook", ignoreCase = true) ||
+                genre.equals("کتاب صوتی", ignoreCase = true) ||
+                genre.equals("پادکست", ignoreCase = true) ||
+                folderName.contains("podcast", ignoreCase = true) ||
+                folderName.contains("پادکست", ignoreCase = true) ||
+                folderName.contains("audiobook", ignoreCase = true) ||
+                folderName.contains("کتاب", ignoreCase = true) ||
+                folderName.contains("castbox", ignoreCase = true) ||
+                folderName.contains("shenoto", ignoreCase = true) ||
+                durationMs > 12 * 60 * 1000L ||
+                title.contains("podcast", ignoreCase = true) ||
+                title.contains("پادکست", ignoreCase = true) ||
+                title.contains("episode", ignoreCase = true) ||
+                title.contains("قسمت", ignoreCase = true) ||
+                title.contains("کتاب صوتی", ignoreCase = true)
+}
+
+enum class SongSortOrder(val labelFa: String, val labelEn: String) {
+    DEFAULT("امتیاز هوشمند", "Smart Rank"),
+    DURATION_DESC("طولانی‌ترین", "Duration (Long)"),
+    DURATION_ASC("کوتاه‌ترین", "Duration (Short)"),
+    SIZE_DESC("حجم فایل (بیشترین)", "Size (Largest)"),
+    SIZE_ASC("حجم فایل (کمترین)", "Size (Smallest)"),
+    TITLE_ASC("عنوان (الفبا)", "Title (A–Z)"),
+    ARTIST_ASC("خواننده (الفبا)", "Artist (A–Z)");
+
+    fun localized(isFa: Boolean = Locale.getDefault().language == "fa"): String =
+        if (isFa) labelFa else labelEn
 }
 
 data class SessionEvaluation(
