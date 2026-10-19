@@ -3,6 +3,7 @@ package com.example.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,7 +24,10 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -60,6 +64,7 @@ import com.example.ui.theme.NeonEmerald
 import com.example.ui.theme.NeonRose
 import com.example.ui.theme.NeonViolet
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun SongListItem(
     song: Song,
@@ -70,9 +75,14 @@ fun SongListItem(
     onDeleteClick: () -> Unit,
     onEditTagsClick: (() -> Unit)? = null,
     onShareClick: (() -> Unit)? = null,
+    onConvertToPodcast: (() -> Unit)? = null,
+    onPlayNext: (() -> Unit)? = null,
+    onAddToQueue: (() -> Unit)? = null,
+    onAddToPlaylist: (() -> Unit)? = null,
     isSelectionMode: Boolean = false,
     isSelected: Boolean = false,
     onToggleSelect: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val tierColor = when (song.rankTier) {
@@ -97,9 +107,14 @@ fun SongListItem(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = {
-                if (isSelectionMode && onToggleSelect != null) onToggleSelect() else onSongClick()
-            })
+            .combinedClickable(
+                onClick = {
+                    if (isSelectionMode && onToggleSelect != null) onToggleSelect() else onSongClick()
+                },
+                onLongClick = {
+                    onLongClick?.invoke() ?: onToggleSelect?.invoke()
+                }
+            )
             .testTag("song_item_${song.id}"),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
@@ -277,6 +292,49 @@ fun SongListItem(
                         modifier = Modifier.background(DarkSurfaceVariant)
                     ) {
                         // Edit Tags
+                        // Play Next
+                        if (onPlayNext != null) {
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(Icons.Default.SkipNext, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
+                                },
+                                text = { Text("پخش به عنوان آهنگ بعدی", color = Color.White) },
+                                onClick = {
+                                    showMenu = false
+                                    onPlayNext()
+                                }
+                            )
+                        }
+
+                        // Add to Queue
+                        if (onAddToQueue != null) {
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(Icons.Default.QueueMusic, contentDescription = null, tint = ElectricBlue, modifier = Modifier.size(18.dp))
+                                },
+                                text = { Text("افزودن به صف پخش", color = Color.White) },
+                                onClick = {
+                                    showMenu = false
+                                    onAddToQueue()
+                                }
+                            )
+                        }
+
+                        // Add to Playlist
+                        if (onAddToPlaylist != null) {
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(Icons.Default.PlaylistAdd, contentDescription = null, tint = NeonAmber, modifier = Modifier.size(18.dp))
+                                },
+                                text = { Text("افزودن به پلی‌لیست", color = Color.White) },
+                                onClick = {
+                                    showMenu = false
+                                    onAddToPlaylist()
+                                }
+                            )
+                        }
+
+                        // Edit Tags
                         if (onEditTagsClick != null) {
                             DropdownMenuItem(
                                 leadingIcon = {
@@ -300,6 +358,20 @@ fun SongListItem(
                                 onClick = {
                                     showMenu = false
                                     onShareClick()
+                                }
+                            )
+                        }
+
+                        // Convert to Podcast
+                        if (onConvertToPodcast != null) {
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(Icons.Default.MusicNote, contentDescription = null, tint = NeonViolet, modifier = Modifier.size(18.dp))
+                                },
+                                text = { Text("انتقال به پادکست‌ها", color = Color.White) },
+                                onClick = {
+                                    showMenu = false
+                                    onConvertToPodcast()
                                 }
                             )
                         }

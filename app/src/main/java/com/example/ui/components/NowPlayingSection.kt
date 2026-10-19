@@ -23,10 +23,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RepeatOne
@@ -124,6 +126,8 @@ fun FullPlayerContent(
     onSetABLoopStart: (() -> Unit)? = null,
     onSetABLoopEnd: (() -> Unit)? = null,
     onClearABLoop: (() -> Unit)? = null,
+    onEqualizerClick: (() -> Unit)? = null,
+    onQueueClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showModeMenu by remember { mutableStateOf(false) }
@@ -243,6 +247,36 @@ fun FullPlayerContent(
                             tint = NeonCyan,
                             modifier = Modifier.size(20.dp)
                         )
+                    }
+
+                    // Equalizer Button
+                    if (onEqualizerClick != null) {
+                        IconButton(
+                            onClick = onEqualizerClick,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Equalizer,
+                                contentDescription = "اکولایزر",
+                                tint = NeonEmerald,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // Queue (Up Next) Button
+                    if (onQueueClick != null) {
+                        IconButton(
+                            onClick = onQueueClick,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QueueMusic,
+                                contentDescription = "صف پخش",
+                                tint = ElectricBlue,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
 
                     // Delete Song Button
@@ -661,11 +695,15 @@ fun FullPlayerContent(
                     onDismissRequest = { showSleepMenu = false },
                     modifier = Modifier.background(DarkSurfaceVariant)
                 ) {
-                    listOf(0, 15, 30, 45, 60).forEach { mins ->
+                    listOf(0, -1, 15, 30, 45, 60, 90).forEach { mins ->
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    text = if (mins == 0) stringResource(R.string.sleep_timer_off) else "$mins mins",
+                                    text = when (mins) {
+                                        0 -> stringResource(R.string.sleep_timer_off)
+                                        -1 -> "پایان همین قطعه"
+                                        else -> "$mins دقیقه"
+                                    },
                                     color = if (mins == sleepTimerMinutes) NeonEmerald else Color.White,
                                     fontWeight = if (mins == sleepTimerMinutes) FontWeight.Bold else FontWeight.Normal
                                 )

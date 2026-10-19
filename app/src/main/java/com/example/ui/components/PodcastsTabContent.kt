@@ -77,15 +77,22 @@ fun PodcastsTabContent(
     onShareClick: (Song) -> Unit,
     onSpeedChange: (Float) -> Unit,
     onSeekRelative: (Long) -> Unit,
+    onConvertToMusic: (Song) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedCategoryFilter by remember { mutableStateOf<String?>(null) } // null = All, "Podcast", "Audiobook"
 
     val displayedList = remember(podcasts, selectedCategoryFilter) {
-        if (selectedCategoryFilter == null) {
+        val base = if (selectedCategoryFilter == null) {
             podcasts
         } else {
             podcasts.filter { it.genre.equals(selectedCategoryFilter, ignoreCase = true) }
+        }
+        // Natural mathematical episode & chapter sequence ordering
+        base.sortedWith { a, b ->
+            val numA = extractEpisodeOrder(a.title)
+            val numB = extractEpisodeOrder(b.title)
+            if (numA != numB) numA.compareTo(numB) else a.title.compareTo(b.title, ignoreCase = true)
         }
     }
 
@@ -270,7 +277,8 @@ fun PodcastsTabContent(
                         onInfoClick = { onInfoClick(item) },
                         onEditTagsClick = { onEditTagsClick(item) },
                         onShareClick = { onShareClick(item) },
-                        onDeleteClick = { onDeleteClick(item) }
+                        onDeleteClick = { onDeleteClick(item) },
+                        onConvertToMusic = { onConvertToMusic(item) }
                     )
                 }
                 item {
@@ -279,6 +287,19 @@ fun PodcastsTabContent(
             }
         }
     }
+}
+
+private fun extractEpisodeOrder(title: String): Long {
+    val clean = title.lowercase()
+    val match = Regex("""(?:ep|episode|قسمت|فصل|ch|chapter|part|بخش)\s*[-_:]?\s*(\d+)""").find(clean)
+    if (match != null) {
+        return match.groupValues[1].toLongOrNull() ?: Long.MAX_VALUE
+    }
+    val leadingNum = Regex("""^(\d+)""").find(clean.trim())
+    if (leadingNum != null) {
+        return leadingNum.groupValues[1].toLongOrNull() ?: Long.MAX_VALUE
+    }
+    return Long.MAX_VALUE
 }
 
 @Composable
@@ -292,7 +313,8 @@ private fun PodcastEpisodeCard(
     onInfoClick: () -> Unit,
     onEditTagsClick: () -> Unit,
     onShareClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onConvertToMusic: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -369,6 +391,14 @@ private fun PodcastEpisodeCard(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false }
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("انتقال به لیست موزیک‌ها") },
+                            leadingIcon = { Icon(Icons.Default.Headphones, contentDescription = null, tint = NeonCyan) },
+                            onClick = {
+                                showMenu = false
+                                onConvertToMusic()
+                            }
+                        )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.action_edit_tags)) },
                             leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },

@@ -4,10 +4,9 @@
 
     <!-- Navigation Tabs -->
     <string name="tab_library">Music</string>
+    <string name="tab_folders">Folders</string>
     <string name="tab_podcasts">Podcasts</string>
-    <string name="tab_rankings">Rankings</string>
-    <string name="tab_discovery">Discovery</string>
-    <string name="tab_analytics">Analytics</string>
+    <string name="tab_favorites">Favorites</string>
 
     <!-- Search & Filter -->
     <string name="search_hint">Search title, artist, or album…</string>

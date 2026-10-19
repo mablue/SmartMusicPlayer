@@ -13,6 +13,9 @@ interface SongDao {
     @Query("SELECT * FROM songs ORDER BY id ASC")
     fun getAllSongs(): Flow<List<SongEntity>>
 
+    @Query("SELECT * FROM songs ORDER BY id ASC")
+    suspend fun getAllSongsOnce(): List<SongEntity>
+
     @Query("SELECT * FROM songs ORDER BY score DESC, playCount DESC")
     fun getRankedSongs(): Flow<List<SongEntity>>
 
@@ -39,6 +42,12 @@ interface SongDao {
 
     @Query("DELETE FROM songs WHERE id = :songId")
     suspend fun deleteSong(songId: Long)
+
+    @Query("UPDATE songs SET genre = :newGenre WHERE id = :songId")
+    suspend fun updateSongGenre(songId: Long, newGenre: String)
+
+    @Query("UPDATE songs SET genre = :newGenre WHERE id IN (:songIds)")
+    suspend fun updateSongsGenre(songIds: List<Long>, newGenre: String)
 
     @Query("DELETE FROM songs WHERE uri LIKE '%smart_song_%'")
     suspend fun deleteDefaultSeedSongs()

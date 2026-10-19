@@ -71,6 +71,14 @@ class SmartAudioPlayer(
     val sleepTimerMinutes: StateFlow<Int> = _sleepTimerMinutes.asStateFlow()
 
     private var sleepTimerJob: kotlinx.coroutines.Job? = null
+    var stopAtEndOfTrack: Boolean = false
+
+    // Equalizer & Audio Effects
+    val audioEffectManager = AudioEffectManager(context)
+
+    // Playback Queue State (Up Next)
+    private val _queue = MutableStateFlow<List<Song>>(emptyList())
+    val queue: StateFlow<List<Song>> = _queue.asStateFlow()
 
     // A-B Repeat Loop State
     private val _abLoopActive = MutableStateFlow(false)
@@ -274,6 +282,14 @@ class SmartAudioPlayer(
             }
 
             mediaPlayer = player
+            try {
+                audioEffectManager.attachToAudioSession(player.audioSessionId)
+            } catch (e: Exception) {
+                Log.d(TAG, "Audio effect attach: ${e.message}")
+            }
+            if (!_queue.value.any { it.id == song.id }) {
+                _queue.value = currentPlaylist.ifEmpty { listOf(song) }
+            }
             _isPlaying.value = true
             _durationMs.value = player.duration.toLong().coerceAtLeast(song.durationMs)
             updateNotification()
@@ -372,16 +388,62 @@ class SmartAudioPlayer(
     fun setSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()
         _sleepTimerMinutes.value = minutes
+        stopAtEndOfTrack = (minutes == -1)
         if (minutes <= 0) return
 
         sleepTimerJob = coroutineScope.launch {
             var remaining = minutes
-            while (remaining > 0) {
+            while (remaining > 1) {
                 kotlinx.coroutines.delay(60_000L)
                 remaining--
                 _sleepTimerMinutes.value = remaining
             }
+            // In final minute: 45s normal, then 15s gentle volume fade-out
+            kotlinx.coroutines.delay(45_000L)
+            for (vol in 10 downTo 1) {
+                try {
+                    mediaPlayer?.setVolume(vol / 10f, vol / 10f)
+                } catch (e: Exception) {}
+                kotlinx.coroutines.delay(1500L)
+            }
             pause()
+            try {
+                mediaPlayer?.setVolume(1.0f, 1.0f)
+            } catch (e: Exception) {}
+            _sleepTimerMinutes.value = 0
+        }
+    }
+
+    fun playNext(song: Song) {
+        val currentList = _queue.value.toMutableList()
+        val currentIdx = currentList.indexOfFirst { it.id == _currentSong.value?.id }
+        if (currentIdx != -1) {
+            currentList.add(currentIdx + 1, song)
+        } else {
+            currentList.add(0, song)
+        }
+        _queue.value = currentList
+    }
+
+    fun addToQueue(song: Song) {
+        _queue.value = _queue.value + song
+    }
+
+    fun removeFromQueue(songId: Long) {
+        _queue.value = _queue.value.filter { it.id != songId }
+    }
+
+    fun clearQueue() {
+        val curr = _currentSong.value
+        _queue.value = if (curr != null) listOf(curr) else emptyList()
+    }
+
+    fun moveQueueItem(fromIndex: Int, toIndex: Int) {
+        val list = _queue.value.toMutableList()
+        if (fromIndex in list.indices && toIndex in list.indices) {
+            val item = list.removeAt(fromIndex)
+            list.add(toIndex, item)
+            _queue.value = list
         }
     }
 
@@ -395,8 +457,15 @@ class SmartAudioPlayer(
             prefs.saveSongResumePosition(song.id, listenedMs, totalMs)
         }
 
-        val nextSong = SmartRankingEngine.selectNextSong(
-            playlist = currentPlaylist,
+        // Check if queue has upcoming tracks
+        val q = _queue.value
+        val currentIdx = q.indexOfFirst { it.id == song?.id }
+        val nextInQueue = if (currentIdx != -1 && currentIdx + 1 < q.size) {
+            q[currentIdx + 1]
+        } else null
+
+        val nextSong = nextInQueue ?: SmartRankingEngine.selectNextSong(
+            playlist = if (q.isNotEmpty()) q else currentPlaylist,
             currentSongId = song?.id,
             mode = _playbackMode.value
         )
@@ -408,18 +477,28 @@ class SmartAudioPlayer(
 
     fun skipPrevious() {
         val song = _currentSong.value
-        if (song != null) {
-            prefs.saveSongResumePosition(song.id, _currentPositionMs.value, _durationMs.value)
+        val pos = _currentPositionMs.value
+
+        if (pos > 3000L) {
+            seekTo(0)
+            return
         }
-        val currentIndex = currentPlaylist.indexOfFirst { it.id == song?.id }
-        val prevSong = if (currentIndex > 0) {
-            currentPlaylist[currentIndex - 1]
-        } else if (currentPlaylist.isNotEmpty()) {
-            currentPlaylist.last()
+
+        if (song != null) {
+            prefs.saveSongResumePosition(song.id, pos, _durationMs.value)
+        }
+
+        val q = _queue.value
+        val currentIdx = q.indexOfFirst { it.id == song?.id }
+        val prevInQueue = if (currentIdx > 0) q[currentIdx - 1] else null
+
+        val prevSong = prevInQueue ?: if (currentPlaylist.isNotEmpty()) {
+            val listIdx = currentPlaylist.indexOfFirst { it.id == song?.id }
+            if (listIdx > 0) currentPlaylist[listIdx - 1] else currentPlaylist.last()
         } else null
 
-        prevSong?.let {
-            playSong(it)
+        if (prevSong != null) {
+            playSong(prevSong)
         }
     }
 
@@ -479,11 +558,24 @@ class SmartAudioPlayer(
             isConsecutiveReplay = isConsecutiveReplay
         )
 
+        if (stopAtEndOfTrack) {
+            stopAtEndOfTrack = false
+            _sleepTimerMinutes.value = 0
+            pause()
+            return
+        }
+
         if (_playbackMode.value == PlaybackMode.REPEAT_ONE) {
             playSong(song)
         } else {
-            val nextSong = SmartRankingEngine.selectNextSong(
-                playlist = currentPlaylist,
+            val q = _queue.value
+            val currentIdx = q.indexOfFirst { it.id == song.id }
+            val nextInQueue = if (currentIdx != -1 && currentIdx + 1 < q.size) {
+                q[currentIdx + 1]
+            } else null
+
+            val nextSong = nextInQueue ?: SmartRankingEngine.selectNextSong(
+                playlist = if (q.isNotEmpty()) q else currentPlaylist,
                 currentSongId = song.id,
                 mode = _playbackMode.value
             )

@@ -33,19 +33,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Checklist
-import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MusicOff
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SwapHoriz
 import com.example.data.model.SongSortOrder
+import com.example.ui.components.FoldersTabContent
 import com.example.ui.components.PodcastsTabContent
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -126,6 +136,7 @@ fun HomeScreen(
     val filteredLibrarySongs by viewModel.filteredLibrarySongs.collectAsStateWithLifecycle()
     val podcastAndAudiobooks by viewModel.podcastAndAudiobooks.collectAsStateWithLifecycle()
     val availableFolders by viewModel.availableFolders.collectAsStateWithLifecycle()
+    val favoriteSongs by viewModel.favoriteSongs.collectAsStateWithLifecycle()
 
     val isPlaying by viewModel.player.isPlaying.collectAsStateWithLifecycle()
     val currentSong by viewModel.player.currentSong.collectAsStateWithLifecycle()
@@ -220,7 +231,9 @@ fun HomeScreen(
             abLoopEndMs = abLoopEndMs,
             onSetABLoopStart = { viewModel.setABLoopStart() },
             onSetABLoopEnd = { viewModel.setABLoopEnd() },
-            onClearABLoop = { viewModel.clearABLoop() }
+            onClearABLoop = { viewModel.clearABLoop() },
+            onEqualizerClick = { viewModel.setEqualizerVisible(true) },
+            onQueueClick = { viewModel.setQueueVisible(true) }
         )
     } else {
         Scaffold(
@@ -228,93 +241,175 @@ fun HomeScreen(
             containerColor = DarkBackground,
             contentWindowInsets = WindowInsets.safeDrawing,
             topBar = {
-                TopAppBar(
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = NeonViolet.copy(alpha = 0.2f),
-                                modifier = Modifier.size(34.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
+                if (uiState.isSelectionMode) {
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(onClick = { viewModel.toggleSelectionMode(false) }) {
+                                Icon(Icons.Default.Close, contentDescription = "بستن", tint = Color.White)
+                            }
+                        },
+                        title = {
+                            Text(
+                                text = "${uiState.selectedSongIds.size} مورد انتخاب شد",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            )
+                        },
+                        actions = {
+                            // Select All
+                            IconButton(onClick = { viewModel.selectAllSongs(filteredLibrarySongs) }) {
+                                Icon(Icons.Default.SelectAll, contentDescription = "انتخاب همه", tint = NeonCyan)
+                            }
+
+                            if (uiState.selectedSongIds.isNotEmpty()) {
+                                // Play Selected
+                                IconButton(onClick = { viewModel.playSelectedSongs() }) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = "پخش انتخاب‌ها", tint = NeonEmerald)
+                                }
+
+                                // Add Selected to Playlist
+                                IconButton(onClick = {
+                                    viewModel.setAddToPlaylistVisible(true, uiState.selectedSongIds.toList())
+                                }) {
+                                    Icon(Icons.Default.PlaylistAdd, contentDescription = "افزودن به پلی‌لیست", tint = NeonAmber)
+                                }
+
+                                // Toggle category between Music and Podcast
+                                IconButton(onClick = {
+                                    val isCurrentlyInPodcasts = uiState.selectedTab == AppTab.PODCASTS
+                                    viewModel.setSelectedSongsCategory(!isCurrentlyInPodcasts)
+                                }) {
                                     Icon(
-                                        imageVector = Icons.Default.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = NeonViolet,
-                                        modifier = Modifier.size(20.dp)
+                                        imageVector = Icons.Default.SwapHoriz,
+                                        contentDescription = "تغییر دسته‌بندی",
+                                        tint = NeonViolet
+                                    )
+                                }
+
+                                // Share Selected
+                                IconButton(onClick = {
+                                    val selected = allSongs.filter { uiState.selectedSongIds.contains(it.id) }
+                                    if (selected.isNotEmpty()) {
+                                        com.example.util.SongShareHelper.shareMultipleSongs(context, selected)
+                                    }
+                                }) {
+                                    Icon(Icons.Default.Share, contentDescription = "اشتراک‌گذاری", tint = Color.White)
+                                }
+
+                                // Delete Selected
+                                IconButton(onClick = { viewModel.deleteSelectedSongs() }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = NeonRose)
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkSurface)
+                    )
+                } else {
+                    TopAppBar(
+                        title = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = NeonViolet.copy(alpha = 0.2f),
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = NeonViolet,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Column {
+                                    Text(
+                                        text = "SmartMusic",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.app_subtitle),
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            color = NeonCyan,
+                                            fontSize = 11.sp
+                                        )
                                     )
                                 }
                             }
-                            Column {
-                                Text(
-                                    text = "SmartMusic",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                )
-                                Text(
-                                    text = stringResource(R.string.app_subtitle),
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = NeonCyan,
-                                        fontSize = 11.sp
-                                    )
-                                )
-                            }
-                        }
-                    },
-                    actions = {
-                        // Scan Storage Button
-                        IconButton(
-                            onClick = { permissionLauncher.launch(permissionToRequest) },
-                            modifier = Modifier.testTag("scan_storage_button")
-                        ) {
-                            if (uiState.isScanning) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    color = NeonCyan,
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
+                        },
+                        actions = {
+                            // User Playlists Button
+                            IconButton(onClick = { viewModel.setUserPlaylistsVisible(true) }) {
                                 Icon(
-                                    imageVector = Icons.Default.FolderOpen,
-                                    contentDescription = stringResource(R.string.scan_storage_tooltip),
-                                    tint = NeonCyan
+                                    imageVector = Icons.Default.QueueMusic,
+                                    contentDescription = "پلی‌لیست‌های من",
+                                    tint = NeonAmber
                                 )
                             }
-                        }
 
-                        // Algorithm Info Button
-                        IconButton(
-                            onClick = { showGeneralInfoDialog = true },
-                            modifier = Modifier.testTag("algorithm_info_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = stringResource(R.string.algorithm_info_tooltip),
-                                tint = Color.White.copy(alpha = 0.85f)
-                            )
-                        }
+                            // Equalizer & Audio FX Button
+                            IconButton(onClick = { viewModel.setEqualizerVisible(true) }) {
+                                Icon(
+                                    imageVector = Icons.Default.Equalizer,
+                                    contentDescription = "اکولایزر و تنظیمات صدا",
+                                    tint = NeonEmerald
+                                )
+                            }
 
-                        // Settings Button
-                        IconButton(
-                            onClick = { viewModel.setShowSettings(true) },
-                            modifier = Modifier.testTag("settings_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = stringResource(R.string.settings_title),
-                                tint = Color.White.copy(alpha = 0.85f)
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = DarkBackground
+                            // Multi-select toggle button
+                            IconButton(onClick = { viewModel.toggleSelectionMode(true) }) {
+                                Icon(
+                                    imageVector = Icons.Default.Checklist,
+                                    contentDescription = "انتخاب چندتایی",
+                                    tint = Color.White.copy(alpha = 0.85f)
+                                )
+                            }
+
+                            // Scan Storage Button
+                            IconButton(
+                                onClick = { permissionLauncher.launch(permissionToRequest) },
+                                modifier = Modifier.testTag("scan_storage_button")
+                            ) {
+                                if (uiState.isScanning) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = NeonCyan,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.FolderOpen,
+                                        contentDescription = stringResource(R.string.scan_storage_tooltip),
+                                        tint = NeonCyan
+                                    )
+                                }
+                            }
+
+                            // Settings Button
+                            IconButton(
+                                onClick = { viewModel.setShowSettings(true) },
+                                modifier = Modifier.testTag("settings_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = stringResource(R.string.settings_title),
+                                    tint = Color.White.copy(alpha = 0.85f)
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = DarkBackground
+                        )
                     )
-                )
+                }
             },
             bottomBar = {
                 Column(
@@ -342,6 +437,7 @@ fun HomeScreen(
                             .fillMaxWidth()
                             .testTag("bottom_nav_bar")
                     ) {
+                        // 1. Music Library
                         NavigationBarItem(
                             selected = uiState.selectedTab == AppTab.LIBRARY,
                             onClick = { viewModel.setSelectedTab(AppTab.LIBRARY) },
@@ -356,6 +452,22 @@ fun HomeScreen(
                             )
                         )
 
+                        // 2. Folders / File Manager
+                        NavigationBarItem(
+                            selected = uiState.selectedTab == AppTab.FOLDERS,
+                            onClick = { viewModel.setSelectedTab(AppTab.FOLDERS) },
+                            icon = { Icon(Icons.Default.Folder, contentDescription = stringResource(R.string.tab_folders)) },
+                            label = { Text(stringResource(R.string.tab_folders), fontSize = 11.sp) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Color.Black,
+                                indicatorColor = NeonEmerald,
+                                selectedTextColor = NeonEmerald,
+                                unselectedIconColor = Color(0xFF94A3B8),
+                                unselectedTextColor = Color(0xFF94A3B8)
+                            )
+                        )
+
+                        // 3. Podcasts & Audiobooks
                         NavigationBarItem(
                             selected = uiState.selectedTab == AppTab.PODCASTS,
                             onClick = { viewModel.setSelectedTab(AppTab.PODCASTS) },
@@ -370,56 +482,16 @@ fun HomeScreen(
                             )
                         )
 
+                        // 4. Favorites & Best Rated
                         NavigationBarItem(
-                            selected = uiState.selectedTab == AppTab.RANKINGS,
-                            onClick = { viewModel.setSelectedTab(AppTab.RANKINGS) },
-                            icon = { Icon(Icons.Default.Leaderboard, contentDescription = stringResource(R.string.tab_rankings)) },
-                            label = { Text(stringResource(R.string.tab_rankings), fontSize = 11.sp) },
+                            selected = uiState.selectedTab == AppTab.FAVORITES,
+                            onClick = { viewModel.setSelectedTab(AppTab.FAVORITES) },
+                            icon = { Icon(Icons.Default.Star, contentDescription = stringResource(R.string.tab_favorites)) },
+                            label = { Text(stringResource(R.string.tab_favorites), fontSize = 11.sp) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Color.Black,
                                 indicatorColor = NeonAmber,
                                 selectedTextColor = NeonAmber,
-                                unselectedIconColor = Color(0xFF94A3B8),
-                                unselectedTextColor = Color(0xFF94A3B8)
-                            )
-                        )
-
-                        NavigationBarItem(
-                            selected = uiState.selectedTab == AppTab.DISCOVERY,
-                            onClick = { viewModel.setSelectedTab(AppTab.DISCOVERY) },
-                            icon = {
-                                Box {
-                                    Icon(Icons.Default.Explore, contentDescription = stringResource(R.string.tab_discovery))
-                                    if (unplayedSongs.isNotEmpty()) {
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = NeonViolet,
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .align(Alignment.TopEnd)
-                                        ) {}
-                                    }
-                                }
-                            },
-                            label = { Text("${stringResource(R.string.tab_discovery)} (${unplayedSongs.size})", fontSize = 11.sp) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.Black,
-                                indicatorColor = NeonViolet,
-                                selectedTextColor = NeonViolet,
-                                unselectedIconColor = Color(0xFF94A3B8),
-                                unselectedTextColor = Color(0xFF94A3B8)
-                            )
-                        )
-
-                        NavigationBarItem(
-                            selected = uiState.selectedTab == AppTab.ANALYTICS,
-                            onClick = { viewModel.setSelectedTab(AppTab.ANALYTICS) },
-                            icon = { Icon(Icons.Default.AutoAwesome, contentDescription = stringResource(R.string.tab_analytics)) },
-                            label = { Text(stringResource(R.string.tab_analytics), fontSize = 11.sp) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.Black,
-                                indicatorColor = NeonEmerald,
-                                selectedTextColor = NeonEmerald,
                                 unselectedIconColor = Color(0xFF94A3B8),
                                 unselectedTextColor = Color(0xFF94A3B8)
                             )
@@ -433,12 +505,6 @@ fun HomeScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                // Live Evaluation Feedback Banner (shows on skip or complete)
-                EvaluationBanner(
-                    evaluation = lastEvaluation,
-                    onDismiss = { viewModel.dismissEvaluation() }
-                )
-
                 // Scan result feedback banner
                 uiState.scanResultMsg?.let { msg ->
                     Card(
@@ -462,7 +528,7 @@ fun HomeScreen(
                             )
                             IconButton(onClick = { viewModel.clearScanMessage() }, modifier = Modifier.size(24.dp)) {
                                 Icon(
-                                    Icons.Default.Clear,
+                                    Icons.Default.Close,
                                     contentDescription = stringResource(R.string.btn_dismiss),
                                     tint = Color.White,
                                     modifier = Modifier.size(16.dp)
@@ -486,46 +552,70 @@ fun HomeScreen(
                                     isPlaying = isPlaying,
                                     searchQuery = uiState.searchQuery,
                                     selectedTier = uiState.selectedTierFilter,
+                                    sortOrder = uiState.sortOrder,
+                                    isSelectionMode = uiState.isSelectionMode,
+                                    selectedSongIds = uiState.selectedSongIds,
                                     onSearchChange = { viewModel.setSearchQuery(it) },
                                     onTierSelect = { viewModel.setTierFilter(it) },
+                                    onSortChange = { viewModel.setSortOrder(it) },
                                     onSongClick = { viewModel.playSong(it) },
+                                    onToggleSelectSong = { viewModel.toggleSongSelection(it) },
+                                    onLongClickSong = { song ->
+                                        viewModel.toggleSelectionMode(true)
+                                        viewModel.toggleSongSelection(song.id)
+                                    },
                                     onInfoClick = { viewModel.setInspectingSong(it) },
                                     onDeleteClick = { viewModel.requestDeleteSong(it) },
                                     onEditTagsClick = { viewModel.setEditingSongTags(it) },
-                                    onShareClick = { SongShareHelper.shareSong(context, it) }
+                                    onShareClick = { SongShareHelper.shareSong(context, it) },
+                                    onConvertToPodcast = { viewModel.setSongCategory(it.id, isPodcast = true) }
                                 )
                             }
 
-                            AppTab.RANKINGS -> {
-                                RankingsTabContent(
-                                    rankedSongs = rankedSongs,
-                                    currentSong = currentSong,
-                                    isPlaying = isPlaying,
-                                    onSongClick = { viewModel.playSong(it) },
-                                    onInfoClick = { viewModel.setInspectingSong(it) },
-                                    onDeleteClick = { viewModel.requestDeleteSong(it) },
-                                    onEditTagsClick = { viewModel.setEditingSongTags(it) },
-                                    onShareClick = { SongShareHelper.shareSong(context, it) }
-                                )
-                            }
-
-                            AppTab.DISCOVERY -> {
-                                DiscoveryTabContent(
-                                    unplayedSongs = unplayedSongs,
-                                    currentSong = currentSong,
-                                    isPlaying = isPlaying,
-                                    onSongClick = { viewModel.playSong(it) },
-                                    onInfoClick = { viewModel.setInspectingSong(it) },
-                                    onDeleteClick = { viewModel.requestDeleteSong(it) },
-                                    onEditTagsClick = { viewModel.setEditingSongTags(it) },
-                                    onShareClick = { SongShareHelper.shareSong(context, it) }
-                                )
-                            }
-
-                            AppTab.ANALYTICS -> {
-                                AnalyticsTab(
+                            AppTab.FOLDERS -> {
+                                FoldersTabContent(
                                     songs = allSongs,
-                                    onResetAllScores = { viewModel.resetAllScores() }
+                                    currentSong = currentSong,
+                                    isPlaying = isPlaying,
+                                    onSongClick = { viewModel.playSong(it) },
+                                    onPlayFolder = { folderSongs ->
+                                        viewModel.player.currentPlaylist = folderSongs
+                                        if (folderSongs.isNotEmpty()) viewModel.player.playSong(folderSongs.first())
+                                    },
+                                    onInfoClick = { viewModel.setInspectingSong(it) },
+                                    onDeleteClick = { viewModel.requestDeleteSong(it) },
+                                    onEditTagsClick = { viewModel.setEditingSongTags(it) },
+                                    onShareClick = { SongShareHelper.shareSong(context, it) }
+                                )
+                            }
+
+                            AppTab.PODCASTS -> {
+                                PodcastsTabContent(
+                                    podcasts = podcastAndAudiobooks,
+                                    currentSong = currentSong,
+                                    isPlaying = isPlaying,
+                                    playbackSpeed = playbackSpeed,
+                                    onSongClick = { viewModel.playSong(it) },
+                                    onInfoClick = { viewModel.setInspectingSong(it) },
+                                    onDeleteClick = { viewModel.requestDeleteSong(it) },
+                                    onEditTagsClick = { viewModel.setEditingSongTags(it) },
+                                    onShareClick = { SongShareHelper.shareSong(context, it) },
+                                    onSpeedChange = { viewModel.setPlaybackSpeed(it) },
+                                    onSeekRelative = { viewModel.seekRelative(it) },
+                                    onConvertToMusic = { viewModel.setSongCategory(it.id, isPodcast = false) }
+                                )
+                            }
+
+                            AppTab.FAVORITES -> {
+                                RankingsTabContent(
+                                    rankedSongs = favoriteSongs,
+                                    currentSong = currentSong,
+                                    isPlaying = isPlaying,
+                                    onSongClick = { viewModel.playSong(it) },
+                                    onInfoClick = { viewModel.setInspectingSong(it) },
+                                    onDeleteClick = { viewModel.requestDeleteSong(it) },
+                                    onEditTagsClick = { viewModel.setEditingSongTags(it) },
+                                    onShareClick = { SongShareHelper.shareSong(context, it) }
                                 )
                             }
                             else -> {}
@@ -750,16 +840,25 @@ private fun LibraryTabContent(
     isPlaying: Boolean,
     searchQuery: String,
     selectedTier: RankTier?,
+    sortOrder: SongSortOrder,
+    isSelectionMode: Boolean,
+    selectedSongIds: Set<Long>,
     onSearchChange: (String) -> Unit,
     onTierSelect: (RankTier?) -> Unit,
+    onSortChange: (SongSortOrder) -> Unit,
     onSongClick: (Song) -> Unit,
+    onToggleSelectSong: (Long) -> Unit,
+    onLongClickSong: (Song) -> Unit,
     onInfoClick: (Song) -> Unit,
     onDeleteClick: (Song) -> Unit,
     onEditTagsClick: (Song) -> Unit,
-    onShareClick: (Song) -> Unit
+    onShareClick: (Song) -> Unit,
+    onConvertToPodcast: (Song) -> Unit
 ) {
+    var showSortMenu by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxSize()) {
-        // Search & Filter Row
+        // Search & Sort Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -774,7 +873,7 @@ private fun LibraryTabContent(
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { onSearchChange("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_clear), tint = Color.White)
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_clear), tint = Color.White)
                         }
                     }
                 },
@@ -789,9 +888,53 @@ private fun LibraryTabContent(
                     unfocusedTextColor = Color.White
                 ),
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .weight(1f)
                     .testTag("search_input")
             )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Sort button with dropdown
+            Box {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = DarkSurface,
+                    border = BorderStroke(1.dp, if (sortOrder != SongSortOrder.DEFAULT) NeonCyan else DarkSurfaceBorder),
+                    modifier = Modifier.size(52.dp)
+                ) {
+                    IconButton(
+                        onClick = { showSortMenu = true },
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sort,
+                            contentDescription = stringResource(R.string.btn_sort),
+                            tint = if (sortOrder != SongSortOrder.DEFAULT) NeonCyan else Color(0xFF94A3B8)
+                        )
+                    }
+                }
+
+                androidx.compose.material3.DropdownMenu(
+                    expanded = showSortMenu,
+                    onDismissRequest = { showSortMenu = false }
+                ) {
+                    SongSortOrder.values().forEach { order ->
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = order.localized(),
+                                    fontWeight = if (order == sortOrder) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (order == sortOrder) NeonCyan else Color.White
+                                )
+                            },
+                            onClick = {
+                                showSortMenu = false
+                                onSortChange(order)
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         // Tier Filter Chips
@@ -872,7 +1015,12 @@ private fun LibraryTabContent(
                         onInfoClick = { onInfoClick(song) },
                         onDeleteClick = { onDeleteClick(song) },
                         onEditTagsClick = { onEditTagsClick(song) },
-                        onShareClick = { onShareClick(song) }
+                        onShareClick = { onShareClick(song) },
+                        onConvertToPodcast = { onConvertToPodcast(song) },
+                        isSelectionMode = isSelectionMode,
+                        isSelected = selectedSongIds.contains(song.id),
+                        onToggleSelect = { onToggleSelectSong(song.id) },
+                        onLongClick = { onLongClickSong(song) }
                     )
                 }
                 item {

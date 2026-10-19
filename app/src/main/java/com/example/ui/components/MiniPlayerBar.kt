@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -63,6 +64,7 @@ fun MiniPlayerBar(
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onOpenFullPlayer: () -> Unit,
+    onQueueClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (song == null) return
@@ -213,6 +215,21 @@ fun MiniPlayerBar(
                         tint = Color.White,
                         modifier = Modifier.size(26.dp)
                     )
+                }
+
+                // Queue Button
+                if (onQueueClick != null) {
+                    IconButton(
+                        onClick = onQueueClick,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.QueueMusic,
+                            contentDescription = "صف پخش",
+                            tint = ElectricBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
 
                 // Expand Full Player Icon

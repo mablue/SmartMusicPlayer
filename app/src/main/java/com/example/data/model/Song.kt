@@ -85,22 +85,35 @@ data class Song(
         get() = if (bitrateKbps > 0) "$bitrateKbps kbps" else "320 kbps HQ"
 
     val isPodcastOrAudiobook: Boolean
-        get() = genre.equals("Podcast", ignoreCase = true) ||
-                genre.equals("Audiobook", ignoreCase = true) ||
-                genre.equals("کتاب صوتی", ignoreCase = true) ||
-                genre.equals("پادکست", ignoreCase = true) ||
-                folderName.contains("podcast", ignoreCase = true) ||
-                folderName.contains("پادکست", ignoreCase = true) ||
-                folderName.contains("audiobook", ignoreCase = true) ||
-                folderName.contains("کتاب", ignoreCase = true) ||
-                folderName.contains("castbox", ignoreCase = true) ||
-                folderName.contains("shenoto", ignoreCase = true) ||
-                durationMs > 12 * 60 * 1000L ||
-                title.contains("podcast", ignoreCase = true) ||
-                title.contains("پادکست", ignoreCase = true) ||
-                title.contains("episode", ignoreCase = true) ||
-                title.contains("قسمت", ignoreCase = true) ||
-                title.contains("کتاب صوتی", ignoreCase = true)
+        get() = when {
+            // Explicit user override to Music
+            genre.equals("Music", ignoreCase = true) ||
+            genre.equals("Song", ignoreCase = true) ||
+            genre.equals("موزیک", ignoreCase = true) ||
+            genre.equals("آهنگ", ignoreCase = true) -> false
+
+            // Explicit user override or detected as Podcast / Audiobook
+            genre.equals("Podcast", ignoreCase = true) ||
+            genre.equals("Audiobook", ignoreCase = true) ||
+            genre.equals("کتاب صوتی", ignoreCase = true) ||
+            genre.equals("پادکست", ignoreCase = true) -> true
+
+            // Fuzzy mathematical heuristic for unclassified tracks
+            else -> {
+                val combined = "$title $folderName".lowercase()
+                val hasKeyword = combined.contains("podcast") ||
+                        combined.contains("پادکست") ||
+                        combined.contains("audiobook") ||
+                        combined.contains("کتاب صوتی") ||
+                        combined.contains("کتاب گویا") ||
+                        combined.contains("episode") ||
+                        combined.contains("قسمت") ||
+                        combined.contains("castbox") ||
+                        combined.contains("shenoto")
+                // Fuzzy duration threshold: files longer than 10 minutes (600,000ms) or matching keywords
+                durationMs > 10 * 60 * 1000L || hasKeyword
+            }
+        }
 }
 
 enum class SongSortOrder(val labelFa: String, val labelEn: String) {

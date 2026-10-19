@@ -50,6 +50,14 @@ class SongRepository(
         songDao.deleteSong(songId)
     }
 
+    suspend fun updateSongGenre(songId: Long, newGenre: String) = withContext(Dispatchers.IO) {
+        songDao.updateSongGenre(songId, newGenre)
+    }
+
+    suspend fun updateSongsGenre(songIds: List<Long>, newGenre: String) = withContext(Dispatchers.IO) {
+        songDao.updateSongsGenre(songIds, newGenre)
+    }
+
     /**
      * Physically deletes the audio file from device storage and removes it from the database.
      */

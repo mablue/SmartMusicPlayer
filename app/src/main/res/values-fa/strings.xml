@@ -3,10 +3,10 @@
     <string name="app_subtitle">رتبه‌بندی انطباقی و شافل هوشمند</string>
 
     <!-- Navigation Tabs -->
-    <string name="tab_library">کتابخانه</string>
-    <string name="tab_rankings">رتبه‌بندی</string>
-    <string name="tab_discovery">نشنیده‌ها</string>
-    <string name="tab_analytics">تحلیل و آمار</string>
+    <string name="tab_library">موزیک‌ها</string>
+    <string name="tab_folders">پوشه‌ها</string>
+    <string name="tab_podcasts">پادکست‌ها</string>
+    <string name="tab_favorites">برگزیده‌ها</string>
 
     <!-- Search & Filter -->
     <string name="search_hint">جستجوی نام آهنگ، خواننده یا سبک…</string>

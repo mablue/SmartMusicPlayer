@@ -24,10 +24,9 @@ import kotlinx.coroutines.launch
 
 enum class AppTab(val titleFa: String, val titleEn: String) {
     LIBRARY("موزیک‌ها", "Music"),
-    PODCASTS("پادکست و کتب", "Podcasts"),
-    RANKINGS("رتبه‌بندی", "Rankings"),
-    DISCOVERY("نشنیده‌ها", "Discovery"),
-    ANALYTICS("آمار و تحلیل", "Analytics")
+    FOLDERS("پوشه‌ها", "Folders"),
+    PODCASTS("پادکست‌ها", "Podcasts"),
+    FAVORITES("برگزیده‌ها", "Favorites")
 }
 
 data class PlayerUiState(
@@ -51,16 +50,25 @@ data class PlayerUiState(
     val isBluetoothAutoPlay: Boolean = true,
     val isCarModeAutoLaunch: Boolean = false,
     val isLyricsTranslation: Boolean = true,
-    val targetLanguage: String = "fa"
+    val targetLanguage: String = "fa",
+    val showEqualizer: Boolean = false,
+    val showQueue: Boolean = false,
+    val showAddToPlaylist: Boolean = false,
+    val showUserPlaylists: Boolean = false,
+    val songsToAddToPlaylist: List<Long> = emptyList()
 )
 
 class MusicPlayerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = MusicDatabase.getDatabase(application)
     private val repository = SongRepository(database.songDao(), application)
+    val playlistRepository = com.example.data.repository.PlaylistRepository(database.playlistDao(), database.songDao())
     private val prefs = PlaybackPreferences.getInstance(application)
 
     val player = SmartAudioPlayer(application, repository, viewModelScope)
+
+    val userPlaylists: StateFlow<List<com.example.data.db.PlaylistEntity>> = playlistRepository.allPlaylists
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allSongs: StateFlow<List<Song>> = repository.allSongs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -147,6 +155,19 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
         list.sortedByDescending { it.lastPlayedTimestamp }
+    }.flowOn(Dispatchers.Default)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Favorites / Top Loved songs (excluding Podcasts)
+    val favoriteSongs: StateFlow<List<Song>> = combine(allSongs, _uiState) { songs, state ->
+        val query = state.searchQuery.trim().lowercase()
+        var list = songs.filter { !it.isPodcastOrAudiobook && (it.score >= 65.0f || it.playCount >= 2) }
+        if (query.isNotEmpty()) {
+            list = list.filter {
+                it.title.lowercase().contains(query) || it.artist.lowercase().contains(query)
+            }
+        }
+        list.sortedByDescending { it.score }
     }.flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -434,6 +455,87 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             }
             toggleSelectionMode(false)
         }
+    }
+
+    fun setSongCategory(songId: Long, isPodcast: Boolean) {
+        viewModelScope.launch {
+            repository.updateSongGenre(songId, if (isPodcast) "Podcast" else "Music")
+        }
+    }
+
+    fun setSelectedSongsCategory(isPodcast: Boolean) {
+        val selectedIds = _uiState.value.selectedSongIds.toList()
+        if (selectedIds.isNotEmpty()) {
+            viewModelScope.launch {
+                repository.updateSongsGenre(selectedIds, if (isPodcast) "Podcast" else "Music")
+                toggleSelectionMode(false)
+            }
+        }
+    }
+
+    fun setEqualizerVisible(visible: Boolean) {
+        _uiState.value = _uiState.value.copy(showEqualizer = visible)
+    }
+
+    fun setQueueVisible(visible: Boolean) {
+        _uiState.value = _uiState.value.copy(showQueue = visible)
+    }
+
+    fun setAddToPlaylistVisible(visible: Boolean, songIds: List<Long> = emptyList()) {
+        _uiState.value = _uiState.value.copy(
+            showAddToPlaylist = visible,
+            songsToAddToPlaylist = songIds
+        )
+    }
+
+    fun setUserPlaylistsVisible(visible: Boolean) {
+        _uiState.value = _uiState.value.copy(showUserPlaylists = visible)
+    }
+
+    fun createPlaylist(name: String, songIds: List<Long>) {
+        viewModelScope.launch {
+            playlistRepository.createPlaylist(name, songIds)
+        }
+    }
+
+    fun addSongsToPlaylist(playlistId: Long, songIds: List<Long>) {
+        viewModelScope.launch {
+            playlistRepository.addSongsToPlaylist(playlistId, songIds)
+        }
+    }
+
+    fun deletePlaylist(playlistId: Long) {
+        viewModelScope.launch {
+            playlistRepository.deletePlaylist(playlistId)
+        }
+    }
+
+    fun playPlaylist(playlist: com.example.data.db.PlaylistEntity) {
+        viewModelScope.launch {
+            val songs = playlistRepository.getSongsForPlaylist(playlist)
+            if (songs.isNotEmpty()) {
+                player.currentPlaylist = songs
+                player.clearQueue()
+                songs.forEach { player.addToQueue(it) }
+                player.playSong(songs.first())
+            }
+        }
+    }
+
+    fun playNext(song: Song) {
+        player.playNext(song)
+    }
+
+    fun addToQueue(song: Song) {
+        player.addToQueue(song)
+    }
+
+    fun removeFromQueue(songId: Long) {
+        player.removeFromQueue(songId)
+    }
+
+    fun clearQueue() {
+        player.clearQueue()
     }
 
     override fun onCleared() {

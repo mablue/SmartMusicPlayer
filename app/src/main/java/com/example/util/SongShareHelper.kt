@@ -54,4 +54,45 @@ object SongShareHelper {
             Toast.makeText(context, "Could not share track", Toast.LENGTH_SHORT).show()
         }
     }
+
+    fun shareMultipleSongs(context: Context, songs: List<Song>) {
+        if (songs.isEmpty()) return
+        try {
+            val audioUris = arrayListOf<Uri>()
+            val textBuilder = StringBuilder("Shared tracks via SmartMusic:\n")
+            songs.forEachIndexed { i, s ->
+                textBuilder.append("${i + 1}. ${s.title} — ${s.artist} (${s.formattedDuration})\n")
+                if (s.uri.isNotEmpty()) {
+                    val u = Uri.parse(s.uri)
+                    if (u.scheme == "content") {
+                        audioUris.add(u)
+                    } else {
+                        val f = File(if (u.scheme == "file") u.path ?: s.uri else s.uri)
+                        if (f.exists()) audioUris.add(Uri.fromFile(f))
+                    }
+                }
+            }
+
+            val shareIntent = if (audioUris.isNotEmpty()) {
+                Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                    type = "audio/*"
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, audioUris)
+                    putExtra(Intent.EXTRA_TEXT, textBuilder.toString())
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            } else {
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, textBuilder.toString())
+                }
+            }
+
+            val chooser = Intent.createChooser(shareIntent, "اشتراک‌گذاری ${songs.size} آهنگ")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            Log.e("SongShareHelper", "Error sharing multiple songs", e)
+            Toast.makeText(context, "خطا در اشتراک‌گذاری فایل‌ها", Toast.LENGTH_SHORT).show()
+        }
+    }
 }
