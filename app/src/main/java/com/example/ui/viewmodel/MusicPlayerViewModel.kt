@@ -547,7 +547,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     fun enableWaveControl() {
         if (waveControl == null) {
             waveControl = com.example.player.WaveControlManager(
-                application,
+                getApplication(),
                 onWaveNext = { player.skipNext(isManual = true) },
                 onWavePrevious = { player.skipPrevious() },
                 onWavePlayPause = { player.togglePlayPause() }

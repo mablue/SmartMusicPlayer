@@ -55,6 +55,7 @@ import com.example.ui.theme.NeonAmber
 import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonRose
 import com.example.ui.theme.NeonViolet
+import androidx.compose.runtime.remember
 
 @Composable
 fun MiniPlayerBar(

@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.example.data.lyrics.LyricsResult
+import com.example.data.lyrics.LyricsService
 
 class SmartAudioPlayer(
     private val context: Context,
@@ -91,6 +93,41 @@ class SmartAudioPlayer(
 
     // Playlist reference
     var currentPlaylist: List<Song> = emptyList()
+
+    // ============================================================
+    // Queue (Up Next) — restored after Media3 migration
+    // ============================================================
+    private val _queue = MutableStateFlow<List<Song>>(emptyList())
+    val queue: StateFlow<List<Song>> = _queue.asStateFlow()
+
+    fun playNext(song: Song) {
+        val list = _queue.value.toMutableList()
+        val idx = list.indexOfFirst { it.id == _currentSong.value?.id }
+        if (idx >= 0) list.add(idx + 1, song) else list.add(0, song)
+        _queue.value = list
+    }
+
+    fun addToQueue(song: Song) {
+        _queue.value = _queue.value + song
+    }
+
+    fun removeFromQueue(songId: Long) {
+        _queue.value = _queue.value.filter { it.id != songId }
+    }
+
+    fun clearQueue() {
+        val current = _currentSong.value
+        _queue.value = if (current != null) listOf(current) else emptyList()
+    }
+
+    fun moveQueueItem(from: Int, to: Int) {
+        val list = _queue.value.toMutableList()
+        if (from in list.indices && to in list.indices) {
+            val item = list.removeAt(from)
+            list.add(to, item)
+            _queue.value = list
+        }
+    }
 
     private var lastPlayedSongId: Long? = null
 
@@ -209,6 +246,11 @@ class SmartAudioPlayer(
         exoPlayer.prepare()
         exoPlayer.seekTo(targetStart)
         exoPlayer.play()
+
+        // Populate queue if not already containing this song
+        if (_queue.value.none { it.id == song.id }) {
+            _queue.value = currentPlaylist.ifEmpty { listOf(song) }
+        }
 
         _isPlaying.value = true
     }
