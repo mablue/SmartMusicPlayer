@@ -8,7 +8,6 @@ import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import com.example.data.preferences.PlaybackPreferences
 
 data class EqualizerBand(
     val index: Short,
@@ -34,7 +33,6 @@ enum class EqPreset(val titleFa: String, val titleEn: String) {
 
 class AudioEffectManager(private val context: Context) {
 
-    private val prefs = PlaybackPreferences.getInstance(context)
 
     private var equalizer: Equalizer? = null
     private var bassBoost: BassBoost? = null

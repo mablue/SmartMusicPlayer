@@ -122,6 +122,10 @@ import com.example.ui.theme.NeonViolet
 import com.example.ui.viewmodel.AppTab
 import com.example.ui.viewmodel.MusicPlayerViewModel
 import com.example.util.SongShareHelper
+import com.example.ui.components.EqualizerDialog
+import com.example.ui.components.QueueSheet
+import com.example.ui.components.AddToPlaylistDialog
+import com.example.ui.components.UserPlaylistsDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -505,6 +509,12 @@ fun HomeScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
+
+                // Live evaluation feedback
+                EvaluationBanner(
+                    evaluation = lastEvaluation,
+                    onDismiss = { viewModel.dismissEvaluation() }
+                )
                 // Scan result feedback banner
                 uiState.scanResultMsg?.let { msg ->
                     Card(
@@ -568,7 +578,10 @@ fun HomeScreen(
                                     onDeleteClick = { viewModel.requestDeleteSong(it) },
                                     onEditTagsClick = { viewModel.setEditingSongTags(it) },
                                     onShareClick = { SongShareHelper.shareSong(context, it) },
-                                    onConvertToPodcast = { viewModel.setSongCategory(it.id, isPodcast = true) }
+                                    onConvertToPodcast = { viewModel.setSongCategory(it.id, isPodcast = true) },
+                                    onPlayNext = { viewModel.playNext(it) },
+                                    onAddToQueue = { viewModel.addToQueue(it) },
+                                    onAddToPlaylist = { viewModel.setAddToPlaylistVisible(true, listOf(it.id)) }
                                 )
                             }
 
@@ -750,6 +763,48 @@ fun HomeScreen(
             onDismiss = { viewModel.setShowCarMode(false) }
         )
     }
+
+    if (uiState.showEqualizer) {
+        EqualizerDialog(
+            audioEffectManager = viewModel.player.audioEffectManager,
+            onDismiss = { viewModel.setEqualizerVisible(false) }
+        )
+    }
+
+    if (uiState.showQueue) {
+        val qList by viewModel.player.queue.collectAsStateWithLifecycle()
+        QueueSheet(
+            currentSong = currentSong,
+            queue = qList,
+            isPlaying = isPlaying,
+            onSongClick = { viewModel.playSong(it) },
+            onRemoveFromQueue = { viewModel.removeFromQueue(it) },
+            onClearQueue = { viewModel.clearQueue() },
+            onDismiss = { viewModel.setQueueVisible(false) }
+        )
+    }
+
+    if (uiState.showAddToPlaylist) {
+        val pls by viewModel.userPlaylists.collectAsStateWithLifecycle()
+        AddToPlaylistDialog(
+            songIds = uiState.songsToAddToPlaylist,
+            playlists = pls,
+            onCreatePlaylist = { n, ids -> viewModel.createPlaylist(n, ids) },
+            onAddToPlaylist = { id, ids -> viewModel.addSongsToPlaylist(id, ids) },
+            onDismiss = { viewModel.setAddToPlaylistVisible(false) }
+        )
+    }
+
+    if (uiState.showUserPlaylists) {
+        val pls by viewModel.userPlaylists.collectAsStateWithLifecycle()
+        UserPlaylistsDialog(
+            playlists = pls,
+            onPlayPlaylist = { viewModel.playPlaylist(it) },
+            onDeletePlaylist = { viewModel.deletePlaylist(it) },
+            onDismiss = { viewModel.setUserPlaylistsVisible(false) }
+        )
+    }
+
 }
 
 @Composable
@@ -853,7 +908,10 @@ private fun LibraryTabContent(
     onDeleteClick: (Song) -> Unit,
     onEditTagsClick: (Song) -> Unit,
     onShareClick: (Song) -> Unit,
-    onConvertToPodcast: (Song) -> Unit
+    onConvertToPodcast: (Song) -> Unit,
+    onPlayNext: (Song) -> Unit = {},
+    onAddToQueue: (Song) -> Unit = {},
+    onAddToPlaylist: (Song) -> Unit = {}
 ) {
     var showSortMenu by remember { mutableStateOf(false) }
 
@@ -1017,6 +1075,9 @@ private fun LibraryTabContent(
                         onEditTagsClick = { onEditTagsClick(song) },
                         onShareClick = { onShareClick(song) },
                         onConvertToPodcast = { onConvertToPodcast(song) },
+                        onPlayNext = { onPlayNext(song) },
+                        onAddToQueue = { onAddToQueue(song) },
+                        onAddToPlaylist = { onAddToPlaylist(song) },
                         isSelectionMode = isSelectionMode,
                         isSelected = selectedSongIds.contains(song.id),
                         onToggleSelect = { onToggleSelectSong(song.id) },

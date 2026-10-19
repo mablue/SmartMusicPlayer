@@ -33,6 +33,49 @@ class SmartAudioPlayer(
     private val TAG = "SmartAudioPlayer"
 
     private var mediaPlayer: MediaPlayer? = null
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+    private var audioFocusRequest: android.media.AudioFocusRequest? = null
+    private val focusChangeListener = android.media.AudioManager.OnAudioFocusChangeListener { change ->
+        when (change) {
+            android.media.AudioManager.AUDIOFOCUS_LOSS -> pause()
+            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> pause()
+            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                try { mediaPlayer?.setVolume(0.3f, 0.3f) } catch (e: Exception) { }
+            }
+            android.media.AudioManager.AUDIOFOCUS_GAIN -> {
+                try { mediaPlayer?.setVolume(0.6f, 0.6f) } catch (e: Exception) { }
+            }
+        }
+    }
+    private fun requestAudioFocus(): Boolean {
+        val r = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val req = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build())
+                .setOnAudioFocusChangeListener(focusChangeListener)
+                .setWillPauseWhenDucked(false)
+                .build()
+            audioFocusRequest = req
+            audioManager.requestAudioFocus(req)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(focusChangeListener,
+                android.media.AudioManager.STREAM_MUSIC,
+                android.media.AudioManager.AUDIOFOCUS_GAIN)
+        }
+        return r == android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
+    private fun abandonAudioFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            audioFocusRequest = null
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(focusChangeListener)
+        }
+    }
     private val handler = Handler(Looper.getMainLooper())
     private val prefs = PlaybackPreferences.getInstance(context)
 
@@ -178,6 +221,7 @@ class SmartAudioPlayer(
      * If the user previously completed or skipped near the end, saved position will be 0 (starts from beginning).
      */
     fun playSong(song: Song, startAtMs: Long = -1L) {
+        requestAudioFocus()
         val prevSong = _currentSong.value
         if (prevSong != null && prevSong.id != song.id) {
             prefs.saveSongResumePosition(prevSong.id, _currentPositionMs.value, _durationMs.value)
@@ -683,6 +727,7 @@ class SmartAudioPlayer(
     }
 
     fun release() {
+        abandonAudioFocus()
         handler.removeCallbacks(progressUpdater)
         releasePlayer()
         MediaPlaybackService.stopNotification(context)
