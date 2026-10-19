@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v1.0.0)'
+        description: 'Version tag (e.g. v1.0.1)'
         required: true
         type: string
 
@@ -30,7 +30,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "ver=${{ inputs.version }}" >> $GITHUB_OUTPUT
           else
-            echo "ver=${GITHUB_REF_NAME}"    >> $GITHUB_OUTPUT
+            echo "ver=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
           fi
 
       - uses: actions/setup-java@v4
@@ -38,74 +38,24 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.3.1'
-
       - uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+          gradle-home-cache-cleanup: true
 
       - name: local.properties
         run: echo "sdk.dir=${ANDROID_HOME}" > local.properties
 
-      - name: Create keystore (bulletproof)
-        shell: bash
+      - name: .env stub
         run: |
-          set +e
-          # مسیرها رو از build.gradle.kts استخراج کن
-          EXTRACTED=""
-          for f in app/build.gradle.kts app/build.gradle build.gradle.kts build.gradle; do
-            [ -f "$f" ] || continue
-            HITS=$(grep -oE 'file\([^)]+\.(jks|keystore)[^)]*\)' "$f" 2>/dev/null \
-                   | sed -E 's/file\(["'\'']?([^"'\'')]+).*/\1/' \
-                   | sed 's#^\.\./##')
-            [ -n "$HITS" ] && EXTRACTED="$EXTRACTED
-          $HITS"
-          done
+          [ -f .env.example ] || printf 'API_KEY=ci_placeholder\n' > .env.example
+          [ -f .env ] || cp .env.example .env
 
-          DEFAULT="my-upload-key.jks
-          release.jks
-          release-keystore.jks
-          upload-keystore.jks
-          keystore.jks
-          app/my-upload-key.jks
-          app/release.jks
-          app/release-keystore.jks
-          app/upload-keystore.jks
-          app/keystore.jks"
-
-          ALL=$(printf "%s\n%s\n" "$EXTRACTED" "$DEFAULT" \
-                | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
-                | sed '/^$/d' | sort -u)
-
-          echo "── candidate paths ──"
-          echo "$ALL"
-          echo "─────────────────────"
-
-          while IFS= read -r t; do
-            [ -z "$t" ] && continue
-            DIR=$(dirname "$t")
-            [ "$DIR" != "." ] && mkdir -p "$DIR"
-            if [ ! -f "$t" ]; then
-              keytool -genkeypair \
-                -keystore "$t" \
-                -storepass android -keypass android \
-                -alias androiddebugkey \
-                -keyalg RSA -keysize 2048 -validity 10000 \
-                -dname "CN=Android Release,O=Android,C=US" \
-                >/dev/null 2>&1
-            fi
-            [ -f "$t" ] && echo "✓ $t" || echo "✗ $t"
-          done <<EOF
-          $ALL
-          EOF
-
-          echo "── final ──"
-          find . -maxdepth 3 \( -name '*.jks' -o -name '*.keystore' \) -not -path './.git/*' | sort
-          exit 0
-
-      - name: google-services.json
+      - name: google-services.json stub
         env:
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
@@ -115,29 +65,67 @@ jobs:
             printf '{"project_info":{"project_number":"0","project_id":"ci-stub","storage_bucket":"ci-stub.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0000000000000000","android_client_info":{"package_name":"com.aistudio.smartmusic.pkjv"}},"oauth_client":[],"api_key":[{"current_key":"ci-stub-key"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}\n' > app/google-services.json
           fi
 
-      - name: .env stub
+      # ===========================================================
+      # CRITICAL: decode the ORIGINAL keystore from secrets.
+      # If missing -> FAIL. NEVER generate a new one.
+      # ===========================================================
+      - name: Decode Release Keystore (REQUIRED)
+        env:
+          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
-          [ -f .env.example ] || printf 'API_KEY=ci_placeholder\n' > .env.example
-          cp .env.example .env
+          if [ -z "${KEYSTORE_B64:-}" ]; then
+            echo "❌ FATAL: RELEASE_KEYSTORE_BASE64 secret is not set."
+            echo ""
+            echo "The release APK MUST be signed with the SAME keystore"
+            echo "as the previously released version, otherwise users"
+            echo "cannot install the update."
+            echo ""
+            echo "Add these secrets in GitHub repo settings:"
+            echo "  RELEASE_KEYSTORE_BASE64  (base64 of original .jks)"
+            echo "  RELEASE_STORE_PASSWORD"
+            echo "  RELEASE_KEY_ALIAS"
+            echo "  RELEASE_KEY_PASSWORD"
+            echo "  EXPECTED_CERT_SHA256     (optional safety check)"
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > my-upload-key.jks
+          echo "✓ Keystore decoded ($(stat -c%s my-upload-key.jks) bytes)"
 
-      # =============================================================
-      # اینجا مهمه: env varها رو ست می‌کنیم که Gradle ببینتشون
-      # =============================================================
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
       - name: assembleRelease
         env:
-          KEYSTORE_PASSWORD: android
-          KEY_PASSWORD:     android
-          KEY_ALIAS:        androiddebugkey
-          STORE_PASSWORD:   android
-          STORE_FILE:       my-upload-key.jks
-          SIGNING_STORE_PASSWORD: android
-          SIGNING_KEY_PASSWORD:   android
-          SIGNING_KEY_ALIAS:      androiddebugkey
+          STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          KEY_PASSWORD:   ${{ secrets.RELEASE_KEY_PASSWORD }}
+          KEY_ALIAS:      ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEYSTORE_PATH:  ${{ github.workspace }}/my-upload-key.jks
         run: |
-          if [ -x ./gradlew ]; then GW=./gradlew; else GW=gradle; fi
-          $GW --no-daemon --stacktrace --no-configuration-cache clean assembleRelease
+          ./gradlew --no-daemon --no-configuration-cache --stacktrace clean assembleRelease
 
-      - name: Collect
+      - name: Verify signature
+        env:
+          EXPECTED: ${{ secrets.EXPECTED_CERT_SHA256 }}
+        run: |
+          APK=$(find . -path '*/build/outputs/apk/release/*.apk' | head -1)
+          echo "APK: $APK"
+          apksigner verify --print-certs "$APK" | tee sig.txt
+          ACTUAL=$(grep -i 'SHA-256 digest' sig.txt | head -1 | sed 's/.*: //' | tr -d ' :' | tr 'A-Z' 'a-z')
+          echo "Actual SHA-256: $ACTUAL"
+          if [ -n "${EXPECTED:-}" ]; then
+            EXPECTED_NORM=$(echo "$EXPECTED" | tr -d ' :' | tr 'A-Z' 'a-z')
+            if [ "$ACTUAL" != "$EXPECTED_NORM" ]; then
+              echo "❌ SIGNATURE MISMATCH - aborting release."
+              echo "   expected: $EXPECTED_NORM"
+              echo "   actual:   $ACTUAL"
+              exit 1
+            fi
+            echo "✅ Signature matches the previous release."
+          else
+            echo "⚠️  EXPECTED_CERT_SHA256 not set - cannot verify signature automatically."
+          fi
+
+      - name: Collect artifacts
         if: success()
         run: |
           mkdir -p out
