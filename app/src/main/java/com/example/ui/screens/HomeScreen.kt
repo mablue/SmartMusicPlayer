@@ -528,7 +528,8 @@ fun HomeScreen(
                                     onResetAllScores = { viewModel.resetAllScores() }
                                 )
                             }
-                        }
+                            else -> {}
+                                                }
                     }
                 }
             }
