@@ -179,4 +179,7 @@
     <string name="btn_change">تغییر</string>
     <string name="btn_done">تأیید</string>
     <string name="tags_updated_msg">تگ‌های قطعه «%s» بروزرسانی شدند</string>
+    <string name="btn_sort">مرتب‌سازی</string>
+    <string name="podcasts_empty_title">هنوز پادکستی نیست</string>
+    <string name="podcasts_empty_desc">فایل‌های صوتی بلند و قسمت‌های پادکست اینجا ظاهر می‌شوند</string>
 </resources>
