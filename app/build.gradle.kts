@@ -34,9 +34,9 @@ android {
       val ksPath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
       val ksFile = file(ksPath)
       storeFile     = ksFile
-      storePassword = System.getenv("STORE_PASSWORD") ?: ""
+      storePassword = System.getenv("STORE_PASSWORD") ?: "SmartMusicVault2026"
       keyAlias      = System.getenv("KEY_ALIAS")      ?: "upload"
-      keyPassword   = System.getenv("KEY_PASSWORD")   ?: ""
+      keyPassword   = System.getenv("KEY_PASSWORD")   ?: "SmartMusicVault2026"
     }
     create("debugConfig") {
       val debugKs = file("${rootDir}/debug.keystore")

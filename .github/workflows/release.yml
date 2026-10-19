@@ -1,0 +1,200 @@
+name: Build & Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v1.0.1)'
+        required: true
+        type: string
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  KS_VAULT_TAG: _keystore-vault
+  KS_FILENAME:  my-upload-key.jks
+  KS_PASSWORD:  SmartMusicVault2026
+  KS_ALIAS:     upload
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VER="${{ inputs.version }}"
+          else
+            VER="${{ github.ref_name }}"
+          fi
+          echo "ver=$VER" >> $GITHUB_OUTPUT
+          echo "Version: $VER"
+
+      - name: Ensure tag exists
+        env:
+          VER: ${{ steps.v.outputs.ver }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git rev-parse "refs/tags/$VER" >/dev/null 2>&1; then
+            git tag "$VER"
+            git push origin "$VER"
+            echo "✓ Created tag $VER"
+          else
+            echo "✓ Tag $VER already exists"
+          fi
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+          gradle-home-cache-cleanup: true
+
+      - name: Prepare local.properties
+        run: echo "sdk.dir=${ANDROID_HOME}" > local.properties
+
+      - name: Prepare .env stub
+        run: |
+          [ -f .env.example ] || printf 'API_KEY=ci_placeholder\n' > .env.example
+          [ -f .env ] || cp .env.example .env
+
+      - name: Prepare google-services.json
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
+            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > app/google-services.json
+          elif [ ! -f app/google-services.json ]; then
+            printf '{"project_info":{"project_number":"0","project_id":"ci-stub","storage_bucket":"ci-stub.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0000000000000000","android_client_info":{"package_name":"com.aistudio.smartmusic.pkjv"}},"oauth_client":[],"api_key":[{"current_key":"ci-stub-key"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}\n' > app/google-services.json
+          fi
+
+      # ========================================================
+      # KEYSTORE VAULT (persistent across all future builds)
+      # ========================================================
+      - name: Restore or create signing keystore
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          if gh release view "$KS_VAULT_TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "✓ Vault found - downloading keystore"
+            gh release download "$KS_VAULT_TAG" \
+              --repo "${{ github.repository }}" \
+              --pattern "$KS_FILENAME" \
+              --output "$KS_FILENAME" \
+              --clobber
+            echo "action=restored"
+          else
+            echo "⚠ First run - generating NEW keystore"
+            keytool -genkeypair -v \
+              -keystore "$KS_FILENAME" \
+              -alias "$KS_ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$KS_PASSWORD" \
+              -keypass "$KS_PASSWORD" \
+              -dname "CN=SmartMusic, O=SmartMusic, C=IR"
+
+            gh release create "$KS_VAULT_TAG" \
+              --repo "${{ github.repository }}" \
+              --title "🔐 Signing Keystore Vault — DO NOT DELETE" \
+              --notes "The permanent signing keystore for this app. DO NOT DELETE this release. If deleted, all future releases will use a DIFFERENT signature and existing users will not be able to update the app. Download this file and keep it as a backup." \
+              --prerelease \
+              "$KS_FILENAME" || {
+                echo "::error::Vault creation failed. It may already exist from a concurrent run."
+                exit 1
+              }
+            echo "action=created"
+          fi
+
+          echo ""
+          echo "── Keystore fingerprint ──"
+          keytool -list -v -keystore "$KS_FILENAME" -storepass "$KS_PASSWORD" \
+            | grep -E 'Alias name:|SHA256:'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build Debug APK
+        env:
+          KEYSTORE_PATH:  ${{ github.workspace }}/${{ env.KS_FILENAME }}
+          STORE_PASSWORD: ${{ env.KS_PASSWORD }}
+          KEY_ALIAS:      ${{ env.KS_ALIAS }}
+          KEY_PASSWORD:   ${{ env.KS_PASSWORD }}
+        run: ./gradlew --no-daemon --no-configuration-cache --stacktrace assembleDebug
+
+      - name: Build Release APK
+        env:
+          KEYSTORE_PATH:  ${{ github.workspace }}/${{ env.KS_FILENAME }}
+          STORE_PASSWORD: ${{ env.KS_PASSWORD }}
+          KEY_ALIAS:      ${{ env.KS_ALIAS }}
+          KEY_PASSWORD:   ${{ env.KS_PASSWORD }}
+        run: ./gradlew --no-daemon --no-configuration-cache --stacktrace assembleRelease
+
+      - name: Verify signatures
+        run: |
+          echo "── Debug APK ──"
+          DBG=$(find . -path '*/build/outputs/apk/debug/*.apk' ! -name '*-unsigned*' | head -1 || true)
+          if [ -n "$DBG" ]; then
+            apksigner verify --print-certs "$DBG" | grep -E 'Signer #1 certificate SHA-256|Alias' || true
+          else
+            echo "No debug APK found"
+          fi
+
+          echo ""
+          echo "── Release APK ──"
+          REL=$(find . -path '*/build/outputs/apk/release/*.apk' ! -name '*-unsigned*' | head -1 || true)
+          if [ -n "$REL" ]; then
+            apksigner verify --print-certs "$REL" | grep -E 'Signer #1 certificate SHA-256|Alias' || true
+          else
+            echo "No release APK found"
+          fi
+
+      - name: Collect APKs
+        run: |
+          mkdir -p out
+          find . -type f -path '*/build/outputs/apk/*/*.apk' ! -name '*-unsigned*' -exec cp {} out/ \;
+          ls -la out/
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartMusic-${{ steps.v.outputs.ver }}
+          path: out/*.apk
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.v.outputs.ver }}
+          name: SmartMusic ${{ steps.v.outputs.ver }}
+          generate_release_notes: true
+          files: out/*.apk
+          draft: false
+          prerelease: false
+          make_latest: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
