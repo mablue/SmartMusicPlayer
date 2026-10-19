@@ -540,6 +540,27 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         player.clearQueue()
     }
 
+
+    // --- Wave-to-Control (Proximity Sensor) ---
+    private var waveControl: com.example.player.WaveControlManager? = null
+
+    fun enableWaveControl() {
+        if (waveControl == null) {
+            waveControl = com.example.player.WaveControlManager(
+                application,
+                onWaveNext = { player.skipNext(isManual = true) },
+                onWavePrevious = { player.skipPrevious() },
+                onWavePlayPause = { player.togglePlayPause() }
+            )
+            waveControl?.start()
+        }
+    }
+
+    fun disableWaveControl() {
+        waveControl?.stop()
+        waveControl = null
+    }
+
     override fun onCleared() {
         super.onCleared()
         player.release()

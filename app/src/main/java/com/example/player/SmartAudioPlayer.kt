@@ -33,11 +33,14 @@ class SmartAudioPlayer(
     private val TAG = "SmartAudioPlayer"
 
     private var mediaPlayer: MediaPlayer? = null
+
+    // --- Modern AudioFocus (developer.android.com/media/optimize/audio-focus) ---
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
     private var audioFocusRequest: android.media.AudioFocusRequest? = null
     private var pausedByFocusLoss = false
     private var duckedByFocusLoss = false
     private val desiredVolume = 0.6f
+
     private val focusChangeListener = android.media.AudioManager.OnAudioFocusChangeListener { change ->
         when (change) {
             android.media.AudioManager.AUDIOFOCUS_LOSS -> {
@@ -62,6 +65,7 @@ class SmartAudioPlayer(
             }
         }
     }
+
     private fun requestAudioFocus(): Boolean {
         val r = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val req = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN)
@@ -82,6 +86,7 @@ class SmartAudioPlayer(
         }
         return r == android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED
     }
+
     private fun abandonAudioFocus() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
@@ -91,6 +96,7 @@ class SmartAudioPlayer(
             audioManager.abandonAudioFocus(focusChangeListener)
         }
     }
+
     private val handler = Handler(Looper.getMainLooper())
     private val prefs = PlaybackPreferences.getInstance(context)
 

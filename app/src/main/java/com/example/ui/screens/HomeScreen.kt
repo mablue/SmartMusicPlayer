@@ -3,6 +3,7 @@ package com.example.ui.screens
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -81,6 +82,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -195,8 +197,21 @@ fun HomeScreen(
     }
 
     // Back handler to collapse full player if open
-    BackHandler(enabled = uiState.showFullPlayer) {
-        viewModel.setShowFullPlayer(false)
+    // Predictive Back for Full Player (developer.android.com/guide/navigation/custom-back/predictive-back-gesture)
+    PredictiveBackHandler(enabled = uiState.showFullPlayer) { progress ->
+        try {
+            progress.collect { backEvent ->
+                // Animate the player card scale/alpha based on backEvent.progress (0.0 to 1.0)
+                // This gives the user a preview of the dismissal.
+                val scale = 1f - (backEvent.progress * 0.15f)
+                // The actual animation is handled by the system's Predictive Back.
+                // For custom UI, you can observe progress here.
+            }
+            // Gesture committed: close full player
+            viewModel.setShowFullPlayer(false)
+        } catch (e: CancellationException) {
+            // Gesture cancelled: do nothing, player stays open
+        }
     }
 
     // If user opened full player, show full player view
