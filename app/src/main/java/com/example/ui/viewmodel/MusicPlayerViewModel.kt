@@ -295,13 +295,14 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         _uiState.value = _uiState.value.copy(pendingDeleteIntentSender = null)
     }
 
+    // --- changed to pass Song object (was passing song.id previously)
     fun playSong(song: Song) {
-        player.playSong(song.id)
+        player.playSong(song)
     }
 
     fun togglePlayPause() {
         if (player.currentSong.value == null && allSongs.value.isNotEmpty()) {
-            player.playSong(allSongs.value.first().id)
+            player.playSong(allSongs.value.first())
         } else {
             player.togglePlayPause()
         }
@@ -420,7 +421,8 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val selected = allSongs.value.filter { _uiState.value.selectedSongIds.contains(it.id) }
         if (selected.isNotEmpty()) {
             player.currentPlaylist = selected
-            player.playSong(selected.first().id)
+            // pass Song object (was passing id previously)
+            player.playSong(selected.first())
             toggleSelectionMode(false)
         }
     }
