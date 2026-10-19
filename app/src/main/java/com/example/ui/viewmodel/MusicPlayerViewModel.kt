@@ -430,7 +430,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             val toDelete = allSongs.value.filter { selectedIds.contains(it.id) }
             toDelete.forEach { song ->
-                repository.deleteSong(song)
+                repository.deleteSong(song.id)
             }
             toggleSelectionMode(false)
         }
