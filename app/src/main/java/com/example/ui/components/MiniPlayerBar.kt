@@ -31,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,7 +79,9 @@ fun MiniPlayerBar(
     }
 
     val safeDuration = durationMs.coerceAtLeast(song.durationMs).coerceAtLeast(1000L)
-    val progressFraction = (currentPositionMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
+    val progressFraction by remember(currentPositionMs, safeDuration) {
+        derivedStateOf { (currentPositionMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f) }
+    }
 
     Card(
         modifier = modifier

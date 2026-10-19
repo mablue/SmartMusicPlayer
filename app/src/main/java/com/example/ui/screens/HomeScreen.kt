@@ -141,6 +141,8 @@ fun HomeScreen(
     val podcastAndAudiobooks by viewModel.podcastAndAudiobooks.collectAsStateWithLifecycle()
     val availableFolders by viewModel.availableFolders.collectAsStateWithLifecycle()
     val favoriteSongs by viewModel.favoriteSongs.collectAsStateWithLifecycle()
+    val queueState by viewModel.player.queue.collectAsStateWithLifecycle()
+    val userPlaylistsState by viewModel.userPlaylists.collectAsStateWithLifecycle()
 
     val isPlaying by viewModel.player.isPlaying.collectAsStateWithLifecycle()
     val currentSong by viewModel.player.currentSong.collectAsStateWithLifecycle()
@@ -772,10 +774,9 @@ fun HomeScreen(
     }
 
     if (uiState.showQueue) {
-        val qList by viewModel.player.queue.collectAsStateWithLifecycle()
         QueueSheet(
             currentSong = currentSong,
-            queue = qList,
+            queue = queueState,
             isPlaying = isPlaying,
             onSongClick = { viewModel.playSong(it) },
             onRemoveFromQueue = { viewModel.removeFromQueue(it) },
@@ -785,10 +786,9 @@ fun HomeScreen(
     }
 
     if (uiState.showAddToPlaylist) {
-        val pls by viewModel.userPlaylists.collectAsStateWithLifecycle()
         AddToPlaylistDialog(
             songIds = uiState.songsToAddToPlaylist,
-            playlists = pls,
+            playlists = userPlaylistsState,
             onCreatePlaylist = { n, ids -> viewModel.createPlaylist(n, ids) },
             onAddToPlaylist = { id, ids -> viewModel.addSongsToPlaylist(id, ids) },
             onDismiss = { viewModel.setAddToPlaylistVisible(false) }
@@ -796,9 +796,8 @@ fun HomeScreen(
     }
 
     if (uiState.showUserPlaylists) {
-        val pls by viewModel.userPlaylists.collectAsStateWithLifecycle()
         UserPlaylistsDialog(
-            playlists = pls,
+            playlists = userPlaylistsState,
             onPlayPlaylist = { viewModel.playPlaylist(it) },
             onDeletePlaylist = { viewModel.deletePlaylist(it) },
             onDismiss = { viewModel.setUserPlaylistsVisible(false) }

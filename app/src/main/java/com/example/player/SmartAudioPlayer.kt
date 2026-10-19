@@ -35,15 +35,30 @@ class SmartAudioPlayer(
     private var mediaPlayer: MediaPlayer? = null
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
     private var audioFocusRequest: android.media.AudioFocusRequest? = null
+    private var pausedByFocusLoss = false
+    private var duckedByFocusLoss = false
+    private val desiredVolume = 0.6f
     private val focusChangeListener = android.media.AudioManager.OnAudioFocusChangeListener { change ->
         when (change) {
-            android.media.AudioManager.AUDIOFOCUS_LOSS -> pause()
-            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> pause()
+            android.media.AudioManager.AUDIOFOCUS_LOSS -> {
+                if (_isPlaying.value) { pausedByFocusLoss = true; pause() }
+                abandonAudioFocus()
+            }
+            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                if (_isPlaying.value) { pausedByFocusLoss = true; pause() }
+            }
             android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                try { mediaPlayer?.setVolume(0.3f, 0.3f) } catch (e: Exception) { }
+                if (_isPlaying.value) {
+                    duckedByFocusLoss = true
+                    try { mediaPlayer?.setVolume(0.2f, 0.2f) } catch (_: Exception) { }
+                }
             }
             android.media.AudioManager.AUDIOFOCUS_GAIN -> {
-                try { mediaPlayer?.setVolume(0.6f, 0.6f) } catch (e: Exception) { }
+                if (duckedByFocusLoss) {
+                    duckedByFocusLoss = false
+                    try { mediaPlayer?.setVolume(desiredVolume, desiredVolume) } catch (_: Exception) { }
+                }
+                if (pausedByFocusLoss) { pausedByFocusLoss = false; resume() }
             }
         }
     }
@@ -310,7 +325,7 @@ class SmartAudioPlayer(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && _playbackSpeed.value != 1.0f) {
                     try {
                         playbackParams = playbackParams.setSpeed(_playbackSpeed.value)
-                    } catch (e: Exception) {}
+                    } catch (e: Exception) { Log.w(TAG, "setSpeed failed: ${e.message}") }
                 }
 
                 setOnCompletionListener {
@@ -447,13 +462,13 @@ class SmartAudioPlayer(
             for (vol in 10 downTo 1) {
                 try {
                     mediaPlayer?.setVolume(vol / 10f, vol / 10f)
-                } catch (e: Exception) {}
+                } catch (e: Exception) { Log.w(TAG, "fade volume step failed: ${e.message}") }
                 kotlinx.coroutines.delay(1500L)
             }
             pause()
             try {
-                mediaPlayer?.setVolume(1.0f, 1.0f)
-            } catch (e: Exception) {}
+                mediaPlayer?.setVolume(desiredVolume, desiredVolume)
+            } catch (e: Exception) { Log.w(TAG, "restore volume failed: ${e.message}") }
             _sleepTimerMinutes.value = 0
         }
     }

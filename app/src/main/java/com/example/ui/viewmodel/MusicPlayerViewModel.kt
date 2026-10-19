@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.db.MusicDatabase
@@ -29,6 +30,7 @@ enum class AppTab(val titleFa: String, val titleEn: String) {
     FAVORITES("برگزیده‌ها", "Favorites")
 }
 
+@Immutable
 data class PlayerUiState(
     val searchQuery: String = "",
     val selectedTierFilter: RankTier? = null,

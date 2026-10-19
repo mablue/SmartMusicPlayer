@@ -60,6 +60,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -136,7 +137,9 @@ fun FullPlayerContent(
     var showABLoopMenu by remember { mutableStateOf(false) }
 
     val safeDuration = durationMs.coerceAtLeast(song?.durationMs ?: 180000L).coerceAtLeast(1000L)
-    val progressFraction = (currentPositionMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
+    val progressFraction by remember(currentPositionMs, safeDuration) {
+        derivedStateOf { (currentPositionMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f) }
+    }
 
     val tierColor = when (song?.rankTier) {
         RankTier.DIAMOND -> ElectricBlue
