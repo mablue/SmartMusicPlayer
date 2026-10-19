@@ -296,12 +296,12 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun playSong(song: Song) {
-        player.playSong(song.id)
+        player.playSong(song)
     }
 
     fun togglePlayPause() {
         if (player.currentSong.value == null && allSongs.value.isNotEmpty()) {
-            player.playSong(allSongs.value.first().id)
+            player.playSong(allSongs.value.first())
         } else {
             player.togglePlayPause()
         }
@@ -420,7 +420,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val selected = allSongs.value.filter { _uiState.value.selectedSongIds.contains(it.id) }
         if (selected.isNotEmpty()) {
             player.currentPlaylist = selected
-            player.playSong(selected.first().id)
+            player.playSong(selected.first())
             toggleSelectionMode(false)
         }
     }
