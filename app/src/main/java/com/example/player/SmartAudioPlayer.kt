@@ -360,14 +360,6 @@ class SmartAudioPlayer(
         _abLoopEndMs.value = null
     }
 
-    fun setReplayGainEnabled(enabled: Boolean) {
-        if (enabled) {
-            val gain = _currentSong.value?.let { ReplayGainProvider.getGainDb(context, it.uri) } ?: 0f
-            replayGainProcessor.setGainDb(gain)
-        } else {
-            replayGainProcessor.reset()
-        }
-    }
 
     fun setPlaybackSpeed(speed: Float) {
         _playbackSpeed.value = speed
