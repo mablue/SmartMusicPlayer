@@ -507,72 +507,74 @@ class SmartAudioPlayer(
             }
 
             _isFetchingLyrics.value = true
-
-            val cached = repository.getCachedLyrics(song.id)
-            if (cached != null) {
-                val (plain, synced, translated) = cached
-                val baseLines: List<LyricLine> = if (synced.isNotBlank()) {
-                    LyricsService.parseLrc(synced)
-                } else {
-                    plain.lines().filter { it.isNotBlank() }.mapIndexed { idx, line ->
-                        LyricLine(timestampMs = idx * 4000L, text = line.trim())
+            try {
+                val cached = repository.getCachedLyrics(song.id)
+                if (cached != null) {
+                    val (plain, synced, translated) = cached
+                    val baseLines: List<LyricLine> = if (synced.isNotBlank()) {
+                        LyricsService.parseLrc(synced)
+                    } else {
+                        plain.lines().filter { it.isNotBlank() }.mapIndexed { idx, line ->
+                            LyricLine(timestampMs = idx * 4000L, text = line.trim())
+                        }
                     }
-                }
-                if (baseLines.isNotEmpty()) {
-                    val finalLines = if (translated.isNotBlank()) {
-                        val trans: List<String?> = if (translated.contains("\u001F")) {
+                    // Only trust translations in new-format caches (U+001F).
+                    // Old format used '\n', which dropped nulls and shifted rows.
+                    val transValid: List<String?>? =
+                        if (translated.isNotBlank() && translated.contains("\u001F")) {
                             translated.split("\u001F").map { if (it == "\u0000") null else it }
-                        } else {
-                            // legacy cache: line-based, blank = null
-                            translated.lines().map { it.ifBlank { null } }
-                        }
-                        baseLines.mapIndexed { idx, l ->
-                            l.copy(translatedText = trans.getOrNull(idx))
-                        }
-                    } else baseLines
+                        } else null
 
-                    _lyricsResult.value = LyricsResult(
-                        lines = finalLines,
-                        isSynced = synced.isNotBlank(),
-                        source = "Cache",
-                        plainText = plain
-                    )
-                    _isFetchingLyrics.value = false
-                    Log.d(TAG, "Cache hit for '${song.title}'")
+                    if (baseLines.isNotEmpty()) {
+                        val finalLines = if (transValid != null) {
+                            baseLines.mapIndexed { idx, l ->
+                                l.copy(translatedText = transValid.getOrNull(idx))
+                            }
+                        } else baseLines
 
-                    if (translated.isBlank() && prefs.isLyricsTranslationEnabled) {
-                        translateCurrentLyrics(prefs.targetTranslationLanguage)
+                        _lyricsResult.value = LyricsResult(
+                            lines = finalLines,
+                            isSynced = synced.isNotBlank(),
+                            source = "Cache",
+                            plainText = plain
+                        )
+                        Log.d(TAG, "Cache hit for '${song.title}' (trans=${transValid != null})")
+
+                        if (transValid == null && prefs.isLyricsTranslationEnabled) {
+                            translateCurrentLyrics(prefs.targetTranslationLanguage)
+                        }
+                        return@launch
                     }
-                    return@launch
                 }
-            }
 
-            val lyrics = LyricsService.fetchLyrics(
-                artist = song.artist,
-                title = song.title,
-                durationSec = song.durationMs / 1000
-            )
-            if (!isActive) return@launch
-            _lyricsResult.value = lyrics
-            _isFetchingLyrics.value = false
+                val lyrics = LyricsService.fetchLyrics(
+                    artist = song.artist,
+                    title = song.title,
+                    durationSec = song.durationMs / 1000
+                )
+                if (!isActive) return@launch
+                _lyricsResult.value = lyrics
 
-            if (lyrics != null) {
-                val plainText = lyrics.lines.joinToString("\n") { it.text }
-                val syncedText = if (lyrics.isSynced) {
-                    lyrics.lines.joinToString("\n") { line ->
-                        val ms = line.timestampMs
-                        val min = ms / 60000
-                        val sec = (ms % 60000) / 1000
-                        val centis = (ms % 1000) / 10
-                        "[%02d:%02d.%02d] %s".format(min, sec, centis, line.text)
-                    }
-                } else ""
-                repository.cacheLyrics(song.id, plainText, syncedText, "")
-                Log.d(TAG, "Cached lyrics for '${song.title}' (synced=${lyrics.isSynced})")
-            }
+                if (lyrics != null) {
+                    val plainText = lyrics.lines.joinToString("\n") { it.text }
+                    val syncedText = if (lyrics.isSynced) {
+                        lyrics.lines.joinToString("\n") { line ->
+                            val ms = line.timestampMs
+                            val min = ms / 60000
+                            val sec = (ms % 60000) / 1000
+                            val centis = (ms % 1000) / 10
+                            "[%02d:%02d.%02d] %s".format(min, sec, centis, line.text)
+                        }
+                    } else ""
+                    repository.cacheLyrics(song.id, plainText, syncedText, "")
+                    Log.d(TAG, "Cached lyrics for '${song.title}' (synced=${lyrics.isSynced})")
+                }
 
-            if (lyrics != null && prefs.isLyricsTranslationEnabled) {
-                translateCurrentLyrics(prefs.targetTranslationLanguage)
+                if (lyrics != null && prefs.isLyricsTranslationEnabled) {
+                    translateCurrentLyrics(prefs.targetTranslationLanguage)
+                }
+            } finally {
+                _isFetchingLyrics.value = false
             }
         }
     }
@@ -583,50 +585,34 @@ class SmartAudioPlayer(
         translateJob?.cancel()
         translateJob = coroutineScope.launch(Dispatchers.IO) {
             _isTranslatingLyrics.value = true
-            val result = ArrayList<LyricLine>(current.lines.size)
-
-            // Parallel in batches of 5 — 100 lines = 20 batches × ~1s = ~20s max,
-            // not 100 sequential requests. Each line is still isolated so a
-            // failed translate returns null and cannot corrupt neighbours.
-            for (chunk in current.lines.chunked(5)) {
-                if (!isActive) return@launch
-                val batch = chunk.map { line ->
-                    async(Dispatchers.IO) {
-                        val t = LyricsService.translateText(line.text, targetLang)
-                        line.copy(translatedText = t)
-                    }
-                }.awaitAll()
-                result.addAll(batch)
+            try {
+                val result = ArrayList<LyricLine>(current.lines.size)
+                for (chunk in current.lines.chunked(5)) {
+                    if (!isActive) return@launch
+                    val batch = chunk.map { line ->
+                        async(Dispatchers.IO) {
+                            val t = LyricsService.translateText(line.text, targetLang)
+                            line.copy(translatedText = t)
+                        }
+                    }.awaitAll()
+                    result.addAll(batch)
+                }
+                _lyricsResult.value = current.copy(lines = result)
+                val plain = current.lines.joinToString("\n") { it.text }
+                val synced = if (current.isSynced) current.plainText else ""
+                val transBlock = result.joinToString("\u001F") { it.translatedText ?: "\u0000" }
+                repository.cacheLyrics(songId, plain, synced, transBlock)
+                Log.d(TAG, "Cached translation for song $songId (${result.size} lines)")
+            } finally {
+                _isTranslatingLyrics.value = false
             }
-
-            _lyricsResult.value = current.copy(lines = result)
-            _isTranslatingLyrics.value = false
-
-            // Persist with unit-separator + null marker so translation rows
-            // stay aligned with lyric rows even if some are null.
-            val plain = current.lines.joinToString("\n") { it.text }
-            val synced = if (current.isSynced) current.plainText else ""
-            val transBlock = result.joinToString("\u001F") { it.translatedText ?: "\u0000" }
-            repository.cacheLyrics(songId, plain, synced, transBlock)
-            Log.d(TAG, "Cached translation for song $songId (${result.size} lines)")
         }
     }
 
     fun ensureQueueInitialized(playlist: List<Song>) {
-        if (playlist.isEmpty()) return
-        val current = _queue.value
-        if (current.isEmpty()) {
+        if (_queue.value.isEmpty() && playlist.isNotEmpty()) {
             _queue.value = playlist
             FileLogger.info(TAG, "Queue initialized with ${playlist.size} songs")
-            return
-        }
-        // Merge: append any new songs (from a fresh scan) without losing
-        // the existing order or duplicating entries.
-        val existingIds = current.map { it.id }.toHashSet()
-        val fresh = playlist.filter { it.id !in existingIds }
-        if (fresh.isNotEmpty()) {
-            _queue.value = current + fresh
-            FileLogger.info(TAG, "Queue merged: +${fresh.size} new songs (total ${_queue.value.size})")
         }
     }
 
@@ -636,6 +622,7 @@ class SmartAudioPlayer(
     }
 
     fun onSongDeleted(deletedId: Long) {
+        _queue.value = _queue.value.filter { it.id != deletedId }
         if (_currentSong.value?.id == deletedId) {
             val wasPlaying = _isPlaying.value
             exoPlayer.stop()
