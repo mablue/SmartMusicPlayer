@@ -46,6 +46,21 @@ class SongRepository(
         songDao.insertSong(SongEntity.fromSong(song))
     }
 
+    suspend fun cacheLyrics(
+        songId: Long,
+        lyrics: String,
+        syncedLyrics: String,
+        translatedLyrics: String = ""
+    ) = withContext(Dispatchers.IO) {
+        songDao.updateSongLyrics(songId, lyrics, syncedLyrics, translatedLyrics)
+    }
+
+    suspend fun getCachedLyrics(songId: Long): Triple<String, String, String>? = withContext(Dispatchers.IO) {
+        val e = songDao.getSongById(songId) ?: return@withContext null
+        if (e.lyrics.isBlank() && e.syncedLyrics.isBlank()) null
+        else Triple(e.lyrics, e.syncedLyrics, e.translatedLyrics)
+    }
+
     suspend fun deleteSong(songId: Long) = withContext(Dispatchers.IO) {
         songDao.deleteSong(songId)
     }

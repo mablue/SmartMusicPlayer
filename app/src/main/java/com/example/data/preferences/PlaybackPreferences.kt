@@ -27,6 +27,10 @@ class PlaybackPreferences(context: Context) {
         get() = prefs.getBoolean(KEY_LYRICS_TRANSLATION, true)
         set(value) = prefs.edit().putBoolean(KEY_LYRICS_TRANSLATION, value).apply()
 
+    var isLyricsAutoSearchEnabled: Boolean
+        get() = prefs.getBoolean(KEY_LYRICS_AUTO_SEARCH, true)
+        set(value) = prefs.edit().putBoolean(KEY_LYRICS_AUTO_SEARCH, value).apply()
+
     var targetTranslationLanguage: String
         get() = prefs.getString(KEY_TARGET_LANG, if (java.util.Locale.getDefault().language == "fa") "fa" else "en") ?: "fa"
         set(value) = prefs.edit().putString(KEY_TARGET_LANG, value).apply()
@@ -64,6 +68,7 @@ class PlaybackPreferences(context: Context) {
         private const val KEY_PLAYBACK_MODE = "key_playback_mode"
         private const val KEY_BT_AUTOPLAY = "key_bt_autoplay"
         private const val KEY_LYRICS_TRANSLATION = "key_lyrics_translation"
+        private const val KEY_LYRICS_AUTO_SEARCH = "key_lyrics_auto_search"
         private const val KEY_TARGET_LANG = "key_target_lang"
         private const val KEY_CAR_MODE_AUTOLAUNCH = "key_car_mode_autolaunch"
         private const val KEY_PREFIX_RESUME_POS = "resume_pos_"

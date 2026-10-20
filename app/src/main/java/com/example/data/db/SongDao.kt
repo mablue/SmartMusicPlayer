@@ -40,6 +40,9 @@ interface SongDao {
     @Update
     suspend fun updateSong(song: SongEntity)
 
+    @Query("UPDATE songs SET lyrics = :lyrics, syncedLyrics = :syncedLyrics, translatedLyrics = :translatedLyrics WHERE id = :songId")
+    suspend fun updateSongLyrics(songId: Long, lyrics: String, syncedLyrics: String, translatedLyrics: String)
+
     @Query("DELETE FROM songs WHERE id = :songId")
     suspend fun deleteSong(songId: Long)
 

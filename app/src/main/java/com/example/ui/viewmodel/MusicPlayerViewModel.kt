@@ -89,7 +89,9 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             isBluetoothAutoPlay = prefs.isBluetoothAutoPlayEnabled,
             isCarModeAutoLaunch = prefs.isCarModeAutoLaunchEnabled,
             isLyricsTranslation = prefs.isLyricsTranslationEnabled,
-            targetLanguage = prefs.targetTranslationLanguage
+            targetLanguage = prefs.targetTranslationLanguage,
+            autoSearchLyrics = prefs.isLyricsAutoSearchEnabled,
+            autoTranslateLyrics = prefs.isLyricsTranslationEnabled
         )
     )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -580,14 +582,14 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun toggleAutoSearchLyrics() {
         val next = !_uiState.value.autoSearchLyrics
-        prefs.isLyricsTranslationEnabled = prefs.isLyricsTranslationEnabled
+        prefs.isLyricsAutoSearchEnabled = next
         _uiState.value = _uiState.value.copy(autoSearchLyrics = next)
     }
 
     fun toggleAutoTranslateLyrics() {
         val next = !_uiState.value.autoTranslateLyrics
         prefs.isLyricsTranslationEnabled = next
-        _uiState.value = _uiState.value.copy(autoTranslateLyrics = next)
+        _uiState.value = _uiState.value.copy(autoTranslateLyrics = next, isLyricsTranslation = next)
     }
 
     fun toggleLyricsPanel() {

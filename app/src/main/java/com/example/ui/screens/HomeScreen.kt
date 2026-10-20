@@ -239,7 +239,7 @@ fun HomeScreen(
             },
             onDeleteClick = { song -> viewModel.requestDeleteSong(song) },
             onCollapse = { viewModel.setShowFullPlayer(false) },
-            onLyricsClick = { viewModel.setShowLyricsSheet(true) },
+            onLyricsClick = { viewModel.toggleLyricsPanel() },
             isBluetoothAutoPlay = uiState.isBluetoothAutoPlay,
             onToggleBluetoothAutoPlay = { viewModel.toggleBluetoothAutoPlay() },
             playbackSpeed = playbackSpeed,

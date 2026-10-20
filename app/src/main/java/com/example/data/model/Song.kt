@@ -44,6 +44,7 @@ data class Song(
     val detectedLanguage: String = "Auto",
     val lyrics: String = "",
     val syncedLyrics: String = "",
+    val translatedLyrics: String = "",
     val resumePositionMs: Long = 0L
 ) {
     val hasResumePosition: Boolean

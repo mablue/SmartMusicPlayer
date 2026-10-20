@@ -27,7 +27,8 @@ data class SongEntity(
     val mimeType: String = "audio/mpeg",
     val detectedLanguage: String = "Auto",
     val lyrics: String = "",
-    val syncedLyrics: String = ""
+    val syncedLyrics: String = "",
+    val translatedLyrics: String = ""
 ) {
     fun toSong(): Song = Song(
         id = id,
@@ -50,7 +51,8 @@ data class SongEntity(
         mimeType = mimeType,
         detectedLanguage = detectedLanguage,
         lyrics = lyrics,
-        syncedLyrics = syncedLyrics
+        syncedLyrics = syncedLyrics,
+        translatedLyrics = translatedLyrics
     )
 
     companion object {
@@ -75,7 +77,8 @@ data class SongEntity(
             mimeType = song.mimeType,
             detectedLanguage = song.detectedLanguage,
             lyrics = song.lyrics,
-            syncedLyrics = song.syncedLyrics
+            syncedLyrics = song.syncedLyrics,
+            translatedLyrics = song.translatedLyrics
         )
     }
 }
