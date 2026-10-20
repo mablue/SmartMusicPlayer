@@ -402,27 +402,19 @@ fun SongListItem(
                     }
                 }
 
-                // Play / Pause Button (compact)
-                IconButton(
-                    onClick = onSongClick,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .background(
-                            if (isCurrentSong) tierColor else Color.White.copy(alpha = 0.08f),
-                            CircleShape
-                        )
-                        .testTag("play_song_${song.id}")
+                // Playback status indicator (non-interactive; tap row toggles)
+                Box(
+                    modifier = Modifier.size(20.dp).testTag("playback_indicator_${song.id}"),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = if (isCurrentSong && isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isCurrentSong && isPlaying) {
-                            androidx.compose.ui.res.stringResource(com.example.R.string.action_pause)
-                        } else {
-                            androidx.compose.ui.res.stringResource(com.example.R.string.action_play)
-                        },
-                        tint = if (isCurrentSong) Color.Black else Color.White,
-                        modifier = Modifier.size(19.dp)
-                    )
+                    if (isCurrentSong) {
+                        Box(
+                            modifier = Modifier.size(10.dp).background(
+                                if (isPlaying) NeonEmerald else Color(0xFF64748B),
+                                CircleShape
+                            )
+                        )
+                    }
                 }
             }
         }

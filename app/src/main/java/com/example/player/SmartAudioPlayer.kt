@@ -308,6 +308,8 @@ class SmartAudioPlayer(
         exoPlayer.seekTo(targetStart)
         exoPlayer.play()
 
+        try { context.startService(Intent(context, PlaybackService::class.java)) } catch (_: Exception) {}
+
         runCatching {
             val sid = exoPlayer.audioSessionId
             if (sid != C.AUDIO_SESSION_ID_UNSET && sid > 0) {

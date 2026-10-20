@@ -25,11 +25,11 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         FileLogger.info("PlaybackService", "onCreate")
 
-        setMediaNotificationProvider(
-            DefaultMediaNotificationProvider.Builder(this)
-                .setChannelId("smart_music_playback")
-                .build()
-        )
+        val provider = DefaultMediaNotificationProvider.Builder(this)
+            .setChannelId("smart_music_playback")
+            .build()
+            .apply { setSmallIcon(com.example.R.drawable.ic_launcher_foreground) }
+        setMediaNotificationProvider(provider)
 
         val instance = SmartAudioPlayer.instance
         val player: Player = if (instance != null) {

@@ -124,6 +124,7 @@ class AudioEffectManager(private val context: Context) {
             // Provide simulated bands for UI controls even if hardware audiofx is in emulator sandbox
             setupSimulatedBands()
         }
+        setEnabled(_isEnabled.value)
     }
 
     private fun setupSimulatedBands() {

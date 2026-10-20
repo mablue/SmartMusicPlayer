@@ -326,6 +326,9 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun playPodcast(song: Song) {
+        if (player.currentSong.value?.id == song.id) {
+            player.togglePlayPause(); return
+        }
         val podcasts = podcastAndAudiobooks.value
         player.currentPlaylist = podcasts
         player.setQueue(podcasts)
@@ -342,8 +345,9 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun playSong(song: Song) {
-        // Reset playlist context if song isn't in it, but never touch
-        // the user's manual queue (Play Next / Add to Queue).
+        if (player.currentSong.value?.id == song.id) {
+            player.togglePlayPause(); return
+        }
         if (player.currentPlaylist.none { it.id == song.id }) {
             player.currentPlaylist = allSongs.value.filter { !it.isPodcastOrAudiobook }
         }
