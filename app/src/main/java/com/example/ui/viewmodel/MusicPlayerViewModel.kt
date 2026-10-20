@@ -57,7 +57,10 @@ data class PlayerUiState(
     val showQueue: Boolean = false,
     val showAddToPlaylist: Boolean = false,
     val showUserPlaylists: Boolean = false,
-    val songsToAddToPlaylist: List<Long> = emptyList()
+    val songsToAddToPlaylist: List<Long> = emptyList(),
+    val autoSearchLyrics: Boolean = true,
+    val autoTranslateLyrics: Boolean = true,
+    val showLyricsPanel: Boolean = false
 )
 
 class MusicPlayerViewModel(application: Application) : AndroidViewModel(application) {
@@ -560,6 +563,28 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         waveControl?.stop()
         waveControl = null
     }
+
+    fun toggleAutoSearchLyrics() {
+        val next = !_uiState.value.autoSearchLyrics
+        prefs.isLyricsTranslationEnabled = prefs.isLyricsTranslationEnabled
+        _uiState.value = _uiState.value.copy(autoSearchLyrics = next)
+    }
+
+    fun toggleAutoTranslateLyrics() {
+        val next = !_uiState.value.autoTranslateLyrics
+        prefs.isLyricsTranslationEnabled = next
+        _uiState.value = _uiState.value.copy(autoTranslateLyrics = next)
+    }
+
+    fun toggleLyricsPanel() {
+        val next = !_uiState.value.showLyricsPanel
+        _uiState.value = _uiState.value.copy(showLyricsPanel = next)
+        if (next) {
+            currentSongForLyrics()?.let { fetchLyricsForCurrent() }
+        }
+    }
+
+    private fun currentSongForLyrics() = player.currentSong.value
 
     override fun onCleared() {
         super.onCleared()

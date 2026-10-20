@@ -108,6 +108,7 @@ import com.example.ui.components.CarModeDialog
 import com.example.ui.components.EditSongTagsDialog
 import com.example.ui.components.FullPlayerContent
 import com.example.ui.components.LyricsViewDialog
+import com.example.ui.components.LyricsPanel
 import com.example.ui.components.MiniPlayerBar
 import com.example.ui.components.SettingsDialog
 import com.example.ui.components.SongListItem
@@ -156,6 +157,9 @@ fun HomeScreen(
     val abLoopActive by viewModel.abLoopActive.collectAsStateWithLifecycle()
     val abLoopStartMs by viewModel.abLoopStartMs.collectAsStateWithLifecycle()
     val abLoopEndMs by viewModel.abLoopEndMs.collectAsStateWithLifecycle()
+    val lyricsResult by viewModel.lyricsResult.collectAsStateWithLifecycle()
+    val isFetchingLyrics by viewModel.isFetchingLyrics.collectAsStateWithLifecycle()
+    val isTranslatingLyrics by viewModel.isTranslatingLyrics.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     var showGeneralInfoDialog by remember { mutableStateOf(false) }
@@ -703,12 +707,27 @@ fun HomeScreen(
         )
     }
 
+    // Full-screen Lyrics Panel (Apple Music style)
+    if (uiState.showLyricsPanel) {
+        LyricsPanel(
+            songTitle = currentSong?.title ?: "—",
+            artist = currentSong?.artist ?: "—",
+            lyricsResult = lyricsResult,
+            isLoading = isFetchingLyrics,
+            isTranslating = isTranslatingLyrics,
+            currentPositionMs = currentPositionMs,
+            autoSearchLyrics = uiState.autoSearchLyrics,
+            autoTranslateLyrics = uiState.autoTranslateLyrics,
+            onToggleAutoSearch = { viewModel.toggleAutoSearchLyrics() },
+            onToggleAutoTranslate = { viewModel.toggleAutoTranslateLyrics() },
+            onSeekTo = { viewModel.seekTo(it) },
+            onRetryFetch = { viewModel.fetchLyricsForCurrent() },
+            onDismiss = { viewModel.toggleLyricsPanel() }
+        )
+    }
+
     // Live Lyrics and Translation Dialog
     if (uiState.showLyricsSheet) {
-        val lyricsResult by viewModel.lyricsResult.collectAsStateWithLifecycle()
-        val isFetchingLyrics by viewModel.isFetchingLyrics.collectAsStateWithLifecycle()
-        val isTranslatingLyrics by viewModel.isTranslatingLyrics.collectAsStateWithLifecycle()
-
         LyricsViewDialog(
             song = currentSong,
             lyricsResult = lyricsResult,
