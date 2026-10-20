@@ -283,13 +283,6 @@ private fun LyricRow(
         1 -> 0.88f
         else -> 0.80f
     }
-    val targetBlur = when {
-        distance == 0 -> 0f
-        distance == 1 -> 0.5f
-        distance == 2 -> 1.2f
-        else -> 2.5f
-    }
-
     val alpha by animateFloatAsState(
         targetValue = targetAlpha,
         animationSpec = tween(durationMillis = 300),
@@ -303,12 +296,6 @@ private fun LyricRow(
         ),
         label = "lyricScale"
     )
-    val blur by animateFloatAsState(
-        targetValue = targetBlur,
-        animationSpec = tween(durationMillis = 400),
-        label = "lyricBlur"
-    )
-
     val textColor by animateColorAsState(
         targetValue = if (isActive) Color.White else Color(0xFFCBD5E1),
         animationSpec = tween(300),
@@ -325,7 +312,6 @@ private fun LyricRow(
                 this.alpha = alpha
                 this.scaleX = scale
                 this.scaleY = scale
-                this.blurRadius = blur * density
             }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
