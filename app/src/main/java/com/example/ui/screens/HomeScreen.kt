@@ -355,7 +355,6 @@ fun HomeScreen(
                                             color = Color.White
                                         )
                                     )
-                                    )
                                 }
                             }
                         },

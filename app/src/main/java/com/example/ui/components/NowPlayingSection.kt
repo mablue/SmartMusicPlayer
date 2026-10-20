@@ -90,6 +90,7 @@ import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonEmerald
 import com.example.ui.theme.NeonRose
 import com.example.ui.theme.NeonViolet
+import androidx.compose.foundation.horizontalScroll
 
 @Composable
 fun FullPlayerContent(
@@ -543,10 +544,11 @@ fun FullPlayerContent(
         Spacer(modifier = Modifier.height(12.dp))
 
         // Chips Row: Playback Mode, Speed, and Sleep Timer
-        androidx.compose.foundation.lazy.LazyRow(
-            modifier = Modifier.fillMaxWidth(),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Playback Mode Chip with Dropdown

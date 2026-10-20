@@ -25,7 +25,7 @@ class ReplayGainAudioProcessor : BaseAudioProcessor() {
         gainFactor = Math.pow(10.0, (gainDb / 20.0)).toFloat()
     }
 
-    fun reset() {
+    override fun onReset() {
         gainFactor = 1.0f
     }
 

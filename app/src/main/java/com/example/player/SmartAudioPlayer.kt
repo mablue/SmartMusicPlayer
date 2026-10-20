@@ -1,6 +1,8 @@
 package com.example.player
 
 import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -37,7 +39,7 @@ class SmartAudioPlayer(
         ReplayGainRenderersFactory(context, replayGainProcessor)
     }
 
-    private val exoPlayer: ExoPlayer by lazy {
+    internal val exoPlayer: ExoPlayer by lazy {
         ExoPlayer.Builder(context).setRenderersFactory(replayGainRenderersFactory)
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -142,12 +144,17 @@ class SmartAudioPlayer(
         instance = this
         setupPlayerListeners()
         restoreSavedMode()
-        // اتصال اکولایزر به ExoPlayer
-        exoPlayer.audioSessionId?.let { audioEffectManager.attachToAudioSession(it) }
     }
 
     private fun setupPlayerListeners() {
         exoPlayer.addListener(object : Player.Listener {
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
+                    android.util.Log.d(TAG, "AudioSessionId changed: $audioSessionId — attaching EQ")
+                    audioEffectManager.attachToAudioSession(audioSessionId)
+                }
+            }
+
             override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) {
                 val gainDb = mediaMetadata.extras?.getFloat("replaygain_db", 0f) ?: 0f
                 replayGainProcessor.setGainDb(gainDb)
@@ -162,6 +169,15 @@ class SmartAudioPlayer(
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) {
                     _durationMs.value = exoPlayer.duration.coerceAtLeast(0L)
+                    // Audio session becomes valid only when player reaches READY.
+                    // Re-attach EQ now so it actually affects the audio output.
+                    runCatching {
+                        val sid = exoPlayer.audioSessionId
+                        if (sid != C.AUDIO_SESSION_ID_UNSET && sid > 0) {
+                            audioEffectManager.attachToAudioSession(sid)
+                            Log.d(TAG, "EQ attached on STATE_READY: session=$sid")
+                        }
+                    }
                 }
                 if (state == Player.STATE_ENDED) {
                     handleTrackCompletion()
@@ -259,10 +275,30 @@ class SmartAudioPlayer(
             )
             .build()
 
+        // Start MediaSessionService so Bluetooth/headset media buttons work
+        try {
+            val svcIntent = Intent(context, PlaybackService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(svcIntent)
+            } else {
+                context.startService(svcIntent)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not start PlaybackService: ${e.message}")
+        }
+
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
         exoPlayer.seekTo(targetStart)
         exoPlayer.play()
+
+        // Fallback: ensure EQ is attached to the current session
+        runCatching {
+            val sid = exoPlayer.audioSessionId
+            if (sid != C.AUDIO_SESSION_ID_UNSET && sid > 0) {
+                audioEffectManager.attachToAudioSession(sid)
+            }
+        }
 
         // Populate queue if not already containing this song
         if (_queue.value.none { it.id == song.id }) {

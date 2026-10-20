@@ -7,6 +7,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink.DefaultAudioProcessorChain
+import androidx.media3.common.audio.AudioProcessor
 
 /**
  * Custom RenderersFactory that injects ReplayGainAudioProcessor into the
@@ -31,7 +32,7 @@ class ReplayGainRenderersFactory(
             .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
             .setAudioProcessorChain(
                 DefaultAudioProcessorChain(
-                    arrayOf(replayGainProcessor) // inject our processor
+                    replayGainProcessor // inject our processor
                 )
             )
             .build()
