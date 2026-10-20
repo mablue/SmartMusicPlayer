@@ -160,9 +160,9 @@ object LyricsService {
             }
 
             // Step 4: Fallback - Google / Web lyrics search
-            val webLyrics = searchGoogleForLyrics(cleanArtist, cleanTitle)
-            if (!webLyrics.isNullOrBlank()) {
-                return@withContext fitPlainLyricsToSongDuration(webLyrics, durationSec * 1000L, "Google Web Search")
+            val lyricaResult = fetchLyricsFromLyrica(cleanArtist, cleanTitle)
+            if (lyricaResult != null) {
+                return@withContext lyricaResult
             }
 
         } catch (e: Exception) {

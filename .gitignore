@@ -26,3 +26,8 @@ e.txt
 compile.log
 *.sh
 !install-sdk-fast.sh
+
+# local test artifacts
+lyrics_test_results/
+*.bak.*
+*.log
