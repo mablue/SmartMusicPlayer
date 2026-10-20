@@ -4,6 +4,7 @@ import android.content.Intent
 import com.example.util.FileLogger
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSessionService
 
 /**
@@ -18,6 +19,14 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Required for Media3 to build and show the media notification
+        setMediaNotificationProvider(
+            DefaultMediaNotificationProvider.Builder(this)
+                .setChannelId("smart_music_playback")
+                .setSmallIcon(android.R.drawable.ic_media_play)
+                .build()
+        )
         FileLogger.info("PlaybackService", "onCreate")
         val instance = SmartAudioPlayer.instance
         if (instance != null) {

@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapHoriz
 import com.example.data.model.SongSortOrder
 import com.example.ui.components.FoldersTabContent
+import com.example.ui.components.PlaylistsTabContent
 import com.example.ui.components.PodcastsTabContent
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -499,12 +500,12 @@ fun HomeScreen(
                             )
                         )
 
-                        // 4. Favorites & Best Rated
+                        // 4. Playlists
                         NavigationBarItem(
-                            selected = uiState.selectedTab == AppTab.FAVORITES,
-                            onClick = { viewModel.setSelectedTab(AppTab.FAVORITES) },
-                            icon = { Icon(Icons.Default.Star, contentDescription = stringResource(R.string.tab_favorites)) },
-                            label = { Text(stringResource(R.string.tab_favorites), fontSize = 11.sp) },
+                            selected = uiState.selectedTab == AppTab.PLAYLISTS,
+                            onClick = { viewModel.setSelectedTab(AppTab.PLAYLISTS) },
+                            icon = { Icon(Icons.Default.QueueMusic, contentDescription = "پلی‌لیست‌ها") },
+                            label = { Text("پلی‌لیست‌ها", fontSize = 11.sp) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Color.Black,
                                 indicatorColor = NeonAmber,
@@ -617,7 +618,7 @@ fun HomeScreen(
                                     currentSong = currentSong,
                                     isPlaying = isPlaying,
                                     playbackSpeed = playbackSpeed,
-                                    onSongClick = { viewModel.playSong(it) },
+                                    onSongClick = { viewModel.playPodcast(it) },
                                     onInfoClick = { viewModel.setInspectingSong(it) },
                                     onDeleteClick = { viewModel.requestDeleteSong(it) },
                                     onEditTagsClick = { viewModel.setEditingSongTags(it) },
@@ -628,16 +629,14 @@ fun HomeScreen(
                                 )
                             }
 
-                            AppTab.FAVORITES -> {
-                                RankingsTabContent(
-                                    rankedSongs = favoriteSongs,
-                                    currentSong = currentSong,
-                                    isPlaying = isPlaying,
-                                    onSongClick = { viewModel.playSong(it) },
-                                    onInfoClick = { viewModel.setInspectingSong(it) },
-                                    onDeleteClick = { viewModel.requestDeleteSong(it) },
-                                    onEditTagsClick = { viewModel.setEditingSongTags(it) },
-                                    onShareClick = { SongShareHelper.shareSong(context, it) }
+                            AppTab.PLAYLISTS -> {
+                                PlaylistsTabContent(
+                                    favoriteSongs = favoriteSongs,
+                                    userPlaylists = userPlaylistsState,
+                                    onPlayFavorites = { viewModel.playFavorites() },
+                                    onPlayPlaylist = { viewModel.playPlaylist(it) },
+                                    onDeletePlaylist = { viewModel.deletePlaylist(it) },
+                                    onCreatePlaylist = { viewModel.setUserPlaylistsVisible(true) }
                                 )
                             }
                             else -> {}

@@ -27,7 +27,7 @@ enum class AppTab(val titleFa: String, val titleEn: String) {
     LIBRARY("موزیک‌ها", "Music"),
     FOLDERS("پوشه‌ها", "Folders"),
     PODCASTS("پادکست‌ها", "Podcasts"),
-    FAVORITES("برگزیده‌ها", "Favorites")
+    PLAYLISTS("پلی‌لیست‌ها", "Playlists")
 }
 
 @Immutable
@@ -184,8 +184,9 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         // Keep player's playlist synchronized with current library and restore last played track
         viewModelScope.launch {
             allSongs.collect { songs ->
-                player.currentPlaylist = songs
-                player.restoreLastSong(songs)
+                val musicOnly = songs.filter { !it.isPodcastOrAudiobook }
+                player.currentPlaylist = musicOnly
+                player.restoreLastSong(musicOnly)
             }
         }
     }
@@ -319,6 +320,19 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun clearPendingDeleteIntent() {
         _uiState.value = _uiState.value.copy(pendingDeleteIntentSender = null)
+    }
+
+    fun playPodcast(song: Song) {
+        player.currentPlaylist = podcastAndAudiobooks.value
+        player.playSong(song)
+    }
+
+    fun playFavorites() {
+        val songs = favoriteSongs.value
+        if (songs.isNotEmpty()) {
+            player.currentPlaylist = songs
+            player.playSong(songs.first())
+        }
     }
 
     fun playSong(song: Song) {
