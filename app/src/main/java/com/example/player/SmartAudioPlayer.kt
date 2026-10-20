@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.example.data.lyrics.LyricLine
 import com.example.data.lyrics.LyricsResult
 import com.example.data.lyrics.LyricsService
 
@@ -457,9 +458,59 @@ class SmartAudioPlayer(
     fun fetchLyricsForSong(song: Song) {
         coroutineScope.launch(Dispatchers.IO) {
             _isFetchingLyrics.value = true
-            val lyrics = LyricsService.fetchLyrics(song.artist, song.title, song.durationMs / 1000)
+
+            // 1) Try DB cache
+            val cached = repository.getCachedLyrics(song.id)
+            if (cached != null) {
+                val (plain, synced, translated) = cached
+                val baseLines: List<LyricLine> = if (synced.isNotBlank()) {
+                    LyricsService.parseLrc(synced)
+                } else {
+                    plain.lines().filter { it.isNotBlank() }.mapIndexed { idx, line ->
+                        LyricLine(timestampMs = idx * 4000L, text = line.trim())
+                    }
+                }
+                if (baseLines.isNotEmpty()) {
+                    val finalLines = if (translated.isNotBlank()) {
+                        val trans = translated.lines()
+                        baseLines.mapIndexed { idx, l ->
+                            l.copy(translatedText = trans.getOrNull(idx)?.takeIf { it.isNotBlank() })
+                        }
+                    } else baseLines
+
+                    _lyricsResult.value = LyricsResult(
+                        lines = finalLines,
+                        isSynced = synced.isNotBlank(),
+                        source = "Cache",
+                        plainText = plain
+                    )
+                    _isFetchingLyrics.value = false
+                    Log.d(TAG, "Cache hit for ${song.title}")
+
+                    if (translated.isBlank() && prefs.isLyricsTranslationEnabled) {
+                        translateCurrentLyrics(prefs.targetTranslationLanguage)
+                    }
+                    return@launch
+                }
+            }
+
+            // 2) Fetch from APIs (LRCLIB / lyrics.ovh / Lyrica)
+            val lyrics = LyricsService.fetchLyrics(
+                artist = song.artist,
+                title = song.title,
+                durationSec = song.durationMs / 1000
+            )
             _lyricsResult.value = lyrics
             _isFetchingLyrics.value = false
+
+            // 3) Cache result
+            if (lyrics != null) {
+                val plainText = lyrics.lines.joinToString("\n") { it.text }
+                val syncedText = if (lyrics.isSynced) lyrics.plainText else ""
+                repository.cacheLyrics(song.id, plainText, syncedText, "")
+                Log.d(TAG, "Cached lyrics for ${song.title}")
+            }
+
             if (lyrics != null && prefs.isLyricsTranslationEnabled) {
                 translateCurrentLyrics(prefs.targetTranslationLanguage)
             }
@@ -468,11 +519,22 @@ class SmartAudioPlayer(
 
     fun translateCurrentLyrics(targetLang: String) {
         val current = _lyricsResult.value ?: return
+        val songId = _currentSong.value?.id ?: return
         coroutineScope.launch(Dispatchers.IO) {
             _isTranslatingLyrics.value = true
-            val translated = current.lines.map { it.copy(translatedText = LyricsService.translateText(it.text, targetLang)) }
-            _lyricsResult.value = current.copy(lines = translated)
+            val translatedLines = current.lines.map { line ->
+                val t = LyricsService.translateText(line.text, targetLang)
+                line.copy(translatedText = t)
+            }
+            _lyricsResult.value = current.copy(lines = translatedLines)
             _isTranslatingLyrics.value = false
+
+            // Persist translation block
+            val plain = current.lines.joinToString("\n") { it.text }
+            val synced = if (current.isSynced) current.plainText else ""
+            val transBlock = translatedLines.joinToString("\n") { it.translatedText ?: "" }
+            repository.cacheLyrics(songId, plain, synced, transBlock)
+            Log.d(TAG, "Cached translation for song $songId")
         }
     }
 

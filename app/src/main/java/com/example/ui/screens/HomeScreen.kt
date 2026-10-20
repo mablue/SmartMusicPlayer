@@ -736,7 +736,7 @@ fun HomeScreen(
             onSeekTo = { viewModel.seekTo(it) },
             onRetryFetch = { viewModel.fetchLyricsForCurrent() },
             onTranslate = { targetLang -> viewModel.translateLyrics(targetLang) },
-            onDismiss = { viewModel.setShowLyricsSheet(false) }
+            onDismiss = { viewModel.toggleLyricsPanel() }
         )
     }
 
