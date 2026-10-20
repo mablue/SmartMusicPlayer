@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.smartmusic.pkjv"
     minSdk = 24
     targetSdk = 36
-    versionCode = 25
-    versionName = "1.1"
+    versionCode = 26
+    versionName = "1.1.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -72,6 +72,9 @@ android {
   buildFeatures {
     compose = true
     buildConfig = true
+  }
+  lint {
+    disable += "InvalidFragmentVersionForActivityResult"
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
   dependenciesInfo {
