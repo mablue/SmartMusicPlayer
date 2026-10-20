@@ -30,8 +30,15 @@ class SmartAudioPlayer(
     private val TAG = "SmartAudioPlayer"
 
     // ---------- ExoPlayer ----------
+
+    // --- ReplayGain (loudness normalization) ---
+    private val replayGainProcessor = ReplayGainAudioProcessor()
+    private val replayGainRenderersFactory by lazy {
+        ReplayGainRenderersFactory(context, replayGainProcessor)
+    }
+
     private val exoPlayer: ExoPlayer by lazy {
-        ExoPlayer.Builder(context)
+        ExoPlayer.Builder(context).setRenderersFactory(replayGainRenderersFactory)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -141,6 +148,12 @@ class SmartAudioPlayer(
 
     private fun setupPlayerListeners() {
         exoPlayer.addListener(object : Player.Listener {
+            override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) {
+                val gainDb = mediaMetadata.extras?.getFloat("replaygain_db", 0f) ?: 0f
+                replayGainProcessor.setGainDb(gainDb)
+                android.util.Log.d(TAG, "ReplayGain applied: ${gainDb} dB (factor ${Math.pow(10.0, (gainDb/20.0))})")
+            }
+
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
                 if (!isPlaying) saveCurrentPosition()
@@ -238,6 +251,10 @@ class SmartAudioPlayer(
                 androidx.media3.common.MediaMetadata.Builder()
                     .setTitle(song.title)
                     .setArtist(song.artist)
+                    .setExtras(android.os.Bundle().apply {
+                        val gain = ReplayGainProvider.getGainDb(context, song.uri)
+                        putFloat("replaygain_db", gain)
+                    })
                     .build()
             )
             .build()
@@ -305,6 +322,15 @@ class SmartAudioPlayer(
         _abLoopActive.value = false
         _abLoopStartMs.value = null
         _abLoopEndMs.value = null
+    }
+
+    fun setReplayGainEnabled(enabled: Boolean) {
+        if (enabled) {
+            val gain = _currentSong.value?.let { ReplayGainProvider.getGainDb(context, it.uri) } ?: 0f
+            replayGainProcessor.setGainDb(gain)
+        } else {
+            replayGainProcessor.reset()
+        }
     }
 
     fun setPlaybackSpeed(speed: Float) {
