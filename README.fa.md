@@ -3,12 +3,13 @@
 
 English
 
-https://github.com/mablue/SmartMusicPlayer/actions/workflows/release.yml/badge.svg
-https://img.shields.io/badge/Platform-Android%2024%2B-3DDC84?logo=android&logoColor=white
-https://img.shields.io/badge/Kotlin-2.x-7F52FF?logo=kotlin&logoColor=white
-https://img.shields.io/badge/UI-Jetpack%20Compose%20M3-4285F4?logo=jetpackcompose&logoColor=white
-https://img.shields.io/badge/Playback-Media3%20ExoPlayer-orange
-https://img.shields.io/badge/License-MIT-blue.svg
+
+[![Build & Release](https://github.com/mablue/SmartMusicPlayer/actions/workflows/release.yml/badge.svg)](https://github.com/mablue/SmartMusicPlayer/actions/workflows/release.yml)
+[![Platform](https://img.shields.io/badge/Platform-Android%2024%2B-3DDC84?logo=android&logoColor=white)](#)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7F52FF?logo=kotlin&logoColor=white)](#)
+[![Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20M3-4285F4?logo=jetpackcompose&logoColor=white)](#)
+[![Media3](https://img.shields.io/badge/Playback-Media3%20ExoPlayer-orange)](#)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 یک پخش‌کننده موسیقی آفلاین برای اندروید که با Jetpack Compose (Material 3) و Media3 ExoPlayer ساخته شده است. به‌جای امتیازدهی دستی، اسمارتمیوزیک امتیاز هر قطعه را از رفتار واقعی شنیداری — تکمیل پخش، اسکیپ، تکرار — می‌سازد و از این امتیازها برای شافل وزنی استفاده می‌کند.
 
