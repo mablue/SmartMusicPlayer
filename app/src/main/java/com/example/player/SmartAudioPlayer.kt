@@ -34,13 +34,10 @@ class SmartAudioPlayer(
     // ---------- ExoPlayer ----------
 
     // --- ReplayGain (loudness normalization) ---
-    private val replayGainProcessor = ReplayGainAudioProcessor()
-    private val replayGainRenderersFactory by lazy {
-        ReplayGainRenderersFactory(context, replayGainProcessor)
-    }
+    // ReplayGain disabled for performance
 
     internal val exoPlayer: ExoPlayer by lazy {
-        ExoPlayer.Builder(context).setRenderersFactory(replayGainRenderersFactory)
+        ExoPlayer.Builder(context)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -144,6 +141,21 @@ class SmartAudioPlayer(
         instance = this
         setupPlayerListeners()
         restoreSavedMode()
+        // Start MediaSessionService immediately so Bluetooth buttons are routed to us
+        startMediaSessionService()
+    }
+
+    private fun startMediaSessionService() {
+        try {
+            val svcIntent = Intent(context, PlaybackService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(svcIntent)
+            } else {
+                context.startService(svcIntent)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not start PlaybackService: ${e.message}")
+        }
     }
 
     private fun setupPlayerListeners() {
@@ -155,11 +167,7 @@ class SmartAudioPlayer(
                 }
             }
 
-            override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) {
-                val gainDb = mediaMetadata.extras?.getFloat("replaygain_db", 0f) ?: 0f
-                replayGainProcessor.setGainDb(gainDb)
-                android.util.Log.d(TAG, "ReplayGain applied: ${gainDb} dB (factor ${Math.pow(10.0, (gainDb/20.0))})")
-            }
+
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
@@ -274,18 +282,6 @@ class SmartAudioPlayer(
                     .build()
             )
             .build()
-
-        // Start MediaSessionService so Bluetooth/headset media buttons work
-        try {
-            val svcIntent = Intent(context, PlaybackService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(svcIntent)
-            } else {
-                context.startService(svcIntent)
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not start PlaybackService: ${e.message}")
-        }
 
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()

@@ -59,12 +59,16 @@ class AudioEffectManager(private val context: Context) {
         if (audioSessionId <= 0 || audioSessionId == currentSessionId) return
         currentSessionId = audioSessionId
 
+        // SAFETY: release old effects before creating new ones
         release()
 
         try {
-            val eq = Equalizer(0, audioSessionId).apply {
-                enabled = _isEnabled.value
+            val eq = runCatching { Equalizer(0, audioSessionId) }.getOrNull() ?: run {
+                Log.w("AudioEffectManager", "Equalizer not supported on this device")
+                setupSimulatedBands()
+                return
             }
+            eq.enabled = false
             equalizer = eq
 
             val numBands = eq.numberOfBands
@@ -82,26 +86,32 @@ class AudioEffectManager(private val context: Context) {
 
             // Bass Boost
             try {
-                val bb = BassBoost(0, audioSessionId).apply {
-                    enabled = _isEnabled.value
-                    if (strengthSupported) {
-                        setStrength(_bassBoostStrength.value.toShort())
+                val bb = runCatching { BassBoost(0, audioSessionId) }.getOrNull()
+                if (bb != null) {
+                    bb.enabled = false
+                    if (bb.strengthSupported) {
+                        bb.setStrength(_bassBoostStrength.value.toShort())
                     }
+                    bassBoost = bb
+                } else {
+                    Log.d("AudioEffectManager", "BassBoost not available")
                 }
-                bassBoost = bb
             } catch (e: Exception) {
                 Log.d("AudioEffectManager", "BassBoost unavailable on this device/emulator: ${e.message}")
             }
 
             // Virtualizer
             try {
-                val virt = Virtualizer(0, audioSessionId).apply {
-                    enabled = _isEnabled.value
-                    if (strengthSupported) {
-                        setStrength(_virtualizerStrength.value.toShort())
+                val virt = runCatching { Virtualizer(0, audioSessionId) }.getOrNull()
+                if (virt != null) {
+                    virt.enabled = false
+                    if (virt.strengthSupported) {
+                        virt.setStrength(_virtualizerStrength.value.toShort())
                     }
+                    virtualizer = virt
+                } else {
+                    Log.d("AudioEffectManager", "Virtualizer not available")
                 }
-                virtualizer = virt
             } catch (e: Exception) {
                 Log.d("AudioEffectManager", "Virtualizer unavailable on this device/emulator: ${e.message}")
             }
