@@ -174,6 +174,76 @@ object LyricsService {
     /**
      * Searches Google for lyrics when database APIs have no record (e.g. Persian / local indie tracks).
      */
+    /**
+     * Lyrica API — open aggregator over LRCLIB / Genius / Musixmatch / YouTube Music / NetEase.
+     * The Turkish test returned synced LRC lyrics via this endpoint, which LRCLIB alone missed.
+     */
+    private suspend fun fetchLyricsFromLyrica(artist: String, title: String): LyricsResult? {
+        return try {
+            val url = "https://wilooper-lyrica.hf.space/lyrics/?artist=" +
+                    URLEncoder.encode(artist, "UTF-8") +
+                    "&song=" + URLEncoder.encode(title, "UTF-8") +
+                    "&timestamps=true"
+
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "SmartMusic-Android/2.0")
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    Log.d(TAG, "Lyrica HTTP ${response.code}")
+                    return null
+                }
+                val body = response.body?.string() ?: return null
+                if (body.isBlank()) return null
+
+                val json = JSONObject(body)
+                if (json.optString("status") != "success") {
+                    Log.d(TAG, "Lyrica status != success")
+                    return null
+                }
+
+                val data = json.optJSONObject("data") ?: return null
+                val lyricsText = data.optString("lyrics", "")
+                if (lyricsText.isBlank()) return null
+                val sourceName = data.optString("source", "unknown")
+
+                // LRC-formatted response → parse as synced
+                if (Regex("""\[\d{2}:\d{2}\.\d{2,3}\]""").containsMatchIn(lyricsText)) {
+                    val parsed = parseLrc(lyricsText)
+                    if (parsed.isNotEmpty()) {
+                        Log.d(TAG, "Lyrica synced ($sourceName, ${parsed.size} lines)")
+                        return LyricsResult(
+                            lines = parsed,
+                            isSynced = true,
+                            source = "Lyrica ($sourceName)",
+                            plainText = lyricsText
+                        )
+                    }
+                }
+
+                // Plain response → auto-fit timing via existing helper later
+                Log.d(TAG, "Lyrica plain ($sourceName, ${lyricsText.length} chars)")
+                val lines = lyricsText.lines()
+                    .filter { it.isNotBlank() }
+                    .mapIndexed { idx, line ->
+                        LyricLine(timestampMs = idx * 4000L, text = line.trim())
+                    }
+
+                LyricsResult(
+                    lines = lines,
+                    isSynced = false,
+                    source = "Lyrica ($sourceName)",
+                    plainText = lyricsText
+                )
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Lyrica API error: ${e.message}")
+            null
+        }
+    }
+
     private fun searchGoogleForLyrics(artist: String, title: String): String? {
         try {
             val query = if (Regex("[\u0600-\u06FF]").containsMatchIn("$artist $title")) {
