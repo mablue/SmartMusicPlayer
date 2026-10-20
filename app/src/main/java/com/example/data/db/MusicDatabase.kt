@@ -14,6 +14,14 @@ abstract class MusicDatabase : RoomDatabase() {
     abstract fun playlistDao(): PlaylistDao
 
     companion object {
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE songs ADD COLUMN translatedLyrics TEXT NOT NULL DEFAULT ''"
+                )
+            }
+        }
         @Volatile
         private var INSTANCE: MusicDatabase? = null
 

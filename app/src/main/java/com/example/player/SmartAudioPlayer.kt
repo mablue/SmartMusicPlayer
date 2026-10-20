@@ -254,7 +254,17 @@ class SmartAudioPlayer(
     }
 
     fun playSong(song: Song, startAtMs: Long = -1L) {
-        FileLogger.info(TAG, "playSong('${song.title}' uri='${song.uri.take(60)}')")
+        FileLogger.info(TAG, "playSong('${song.title}')")
+
+        // Resolve URI before mutating state
+        val playableUri = when {
+            song.uri.isNotEmpty() -> song.uri
+            else -> getFallbackUri(song).takeIf { it.isNotEmpty() } ?: run {
+                FileLogger.warn(TAG, "No playable URI for '${song.title}' — aborting")
+                return
+            }
+        }
+
         val prevSong = _currentSong.value
         if (prevSong != null && prevSong.id != song.id) {
             saveCurrentPosition()
@@ -265,9 +275,7 @@ class SmartAudioPlayer(
             prefs.getSongResumePosition(song.id).takeIf { it > 0 && it < song.durationMs * 0.95 } ?: 0L
         }
 
-        val isReplay = lastPlayedSongId == song.id
         lastPlayedSongId = song.id
-
         _currentSong.value = song.copy(resumePositionMs = targetStart)
         _currentPositionMs.value = targetStart
         prefs.lastSongId = song.id
@@ -276,18 +284,13 @@ class SmartAudioPlayer(
 
         fetchLyricsForSong(song)
 
-        // ساخت MediaItem از Song
         val mediaItem = MediaItem.Builder()
             .setMediaId(song.id.toString())
-            .setUri(song.uri.takeIf { it.isNotEmpty() } ?: getFallbackUri(song))
+            .setUri(playableUri)
             .setMediaMetadata(
                 androidx.media3.common.MediaMetadata.Builder()
                     .setTitle(song.title)
                     .setArtist(song.artist)
-                    .setExtras(android.os.Bundle().apply {
-                        val gain = ReplayGainProvider.getGainDb(context, song.uri)
-                        putFloat("replaygain_db", gain)
-                    })
                     .build()
             )
             .build()
@@ -297,7 +300,6 @@ class SmartAudioPlayer(
         exoPlayer.seekTo(targetStart)
         exoPlayer.play()
 
-        // Fallback: ensure EQ is attached to the current session
         runCatching {
             val sid = exoPlayer.audioSessionId
             if (sid != C.AUDIO_SESSION_ID_UNSET && sid > 0) {
@@ -305,16 +307,15 @@ class SmartAudioPlayer(
             }
         }
 
-        // Populate queue if not already containing this song
-        if (_queue.value.none { it.id == song.id }) {
-            _queue.value = currentPlaylist.ifEmpty { listOf(song) }
-        }
-
         _isPlaying.value = true
     }
 
     private fun getFallbackUri(song: Song): String {
-        return "asset:///procedural_${song.id}.mp3" // Placeholder — بعداً با ProceduralAudioGenerator جایگزین شود
+        return ProceduralAudioGenerator.getOrCreateSongAudioFile(
+            context,
+            song.id,
+            durationSeconds = (song.durationMs / 1000).toInt().coerceAtLeast(30)
+        )
     }
 
     fun pause() {
@@ -399,13 +400,36 @@ class SmartAudioPlayer(
             evaluateAndSaveSession(song, exoPlayer.currentPosition, exoPlayer.duration, isManual)
             saveCurrentPosition()
         }
+
+        // Check user queue first
+        val q = _queue.value
+        val currentIdx = q.indexOfFirst { it.id == song?.id }
+        if (currentIdx >= 0 && currentIdx + 1 < q.size) {
+            val next = q[currentIdx + 1]
+            FileLogger.info(TAG, "skipNext -> from queue: ${next.title}")
+            playSong(next)
+            return
+        }
+
+        // Fallback to playlist ranking
         val next = SmartRankingEngine.selectNextSong(currentPlaylist, song?.id, _playbackMode.value)
-        next?.let { playSong(it) }
+        if (next != null) {
+            FileLogger.info(TAG, "skipNext -> from playlist: ${next.title}")
+            playSong(next)
+        }
     }
 
     fun skipPrevious() {
         if (exoPlayer.currentPosition > 3000) { seekTo(0); return }
         val song = _currentSong.value ?: return
+
+        val q = _queue.value
+        val qIdx = q.indexOfFirst { it.id == song.id }
+        if (qIdx > 0) {
+            playSong(q[qIdx - 1])
+            return
+        }
+
         val idx = currentPlaylist.indexOfFirst { it.id == song.id }
         val prev = if (idx > 0) currentPlaylist[idx - 1] else currentPlaylist.lastOrNull()
         prev?.let { playSong(it) }
@@ -434,7 +458,8 @@ class SmartAudioPlayer(
 
     private fun handleTrackCompletion() {
         val song = _currentSong.value ?: return
-        val total = exoPlayer.duration
+        val rawDuration = exoPlayer.duration
+        val total = if (rawDuration > 0 && rawDuration != C.TIME_UNSET) rawDuration else song.durationMs.coerceAtLeast(1000L)
         val pos = exoPlayer.currentPosition
         val fullPlay = pos >= total * 0.85f
         if (fullPlay) prefs.saveSongResumePosition(song.id, 0L, song.durationMs)
@@ -442,10 +467,19 @@ class SmartAudioPlayer(
 
         if (_playbackMode.value == PlaybackMode.REPEAT_ONE) {
             playSong(song)
-        } else {
-            val next = SmartRankingEngine.selectNextSong(currentPlaylist, song.id, _playbackMode.value)
-            next?.let { playSong(it) }
+            return
         }
+
+        // Advance without double-rating
+        val q = _queue.value
+        val qIdx = q.indexOfFirst { it.id == song.id }
+        if (qIdx >= 0 && qIdx + 1 < q.size) {
+            playSong(q[qIdx + 1])
+            return
+        }
+
+        val next = SmartRankingEngine.selectNextSong(currentPlaylist, song.id, _playbackMode.value)
+        next?.let { playSong(it) }
     }
 
     private fun evaluateAndSaveSession(song: Song, listenedMs: Long, totalMs: Long, isManualSkip: Boolean) {
@@ -455,11 +489,20 @@ class SmartAudioPlayer(
         coroutineScope.launch(Dispatchers.IO) { repository.updateSong(updated) }
     }
 
-    fun fetchLyricsForSong(song: Song) {
+    fun fetchLyricsForSong(song: Song, force: Boolean = false) {
         coroutineScope.launch(Dispatchers.IO) {
+            // Honor auto-search toggle (only skip network if no cache unless forced)
+            if (!force && !prefs.isLyricsAutoSearchEnabled) {
+                val cached = repository.getCachedLyrics(song.id)
+                if (cached == null) {
+                    Log.d(TAG, "Auto-search disabled, no cache for '${song.title}' — skipping")
+                    return@launch
+                }
+            }
+
             _isFetchingLyrics.value = true
 
-            // 1) Try DB cache
+            // 1) Cache
             val cached = repository.getCachedLyrics(song.id)
             if (cached != null) {
                 val (plain, synced, translated) = cached
@@ -485,7 +528,7 @@ class SmartAudioPlayer(
                         plainText = plain
                     )
                     _isFetchingLyrics.value = false
-                    Log.d(TAG, "Cache hit for ${song.title}")
+                    Log.d(TAG, "Cache hit for '${song.title}'")
 
                     if (translated.isBlank() && prefs.isLyricsTranslationEnabled) {
                         translateCurrentLyrics(prefs.targetTranslationLanguage)
@@ -494,7 +537,7 @@ class SmartAudioPlayer(
                 }
             }
 
-            // 2) Fetch from APIs (LRCLIB / lyrics.ovh / Lyrica)
+            // 2) Fetch from APIs
             val lyrics = LyricsService.fetchLyrics(
                 artist = song.artist,
                 title = song.title,
@@ -503,12 +546,20 @@ class SmartAudioPlayer(
             _lyricsResult.value = lyrics
             _isFetchingLyrics.value = false
 
-            // 3) Cache result
+            // 3) Cache — reconstruct LRC from lines to preserve timestamps
             if (lyrics != null) {
                 val plainText = lyrics.lines.joinToString("\n") { it.text }
-                val syncedText = if (lyrics.isSynced) lyrics.plainText else ""
+                val syncedText = if (lyrics.isSynced) {
+                    lyrics.lines.joinToString("\n") { line ->
+                        val ms = line.timestampMs
+                        val min = ms / 60000
+                        val sec = (ms % 60000) / 1000
+                        val centis = (ms % 1000) / 10
+                        "[%02d:%02d.%02d] %s".format(min, sec, centis, line.text)
+                    }
+                } else ""
                 repository.cacheLyrics(song.id, plainText, syncedText, "")
-                Log.d(TAG, "Cached lyrics for ${song.title}")
+                Log.d(TAG, "Cached lyrics for '${song.title}' (synced=${lyrics.isSynced})")
             }
 
             if (lyrics != null && prefs.isLyricsTranslationEnabled) {
@@ -536,6 +587,18 @@ class SmartAudioPlayer(
             repository.cacheLyrics(songId, plain, synced, transBlock)
             Log.d(TAG, "Cached translation for song $songId")
         }
+    }
+
+    fun ensureQueueInitialized(playlist: List<Song>) {
+        if (_queue.value.isEmpty() && playlist.isNotEmpty()) {
+            _queue.value = playlist
+            FileLogger.info(TAG, "Queue initialized with ${playlist.size} songs")
+        }
+    }
+
+    fun setQueue(songs: List<Song>) {
+        _queue.value = songs
+        FileLogger.info(TAG, "Queue replaced with ${songs.size} songs")
     }
 
     fun onSongDeleted(deletedId: Long) {

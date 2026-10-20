@@ -10,21 +10,21 @@ import androidx.media3.session.MediaSessionService
 import com.example.util.FileLogger
 
 /**
- * MediaSessionService — lets Media3 handle Bluetooth/headset media buttons
- * automatically. The custom Callback handles Next/Prev/PlayPause explicitly
- * so single-tap on headsets is reliable across Android 12–15.
+ * MediaSessionService with explicit media-button handling.
  *
- * Reference: developer.android.com/media/legacy/media-buttons
+ * Bluetooth Next/Prev MUST route through SmartAudioPlayer.skipNext/
+ * skipPrevious — calling player.seekToNextMediaItem() does nothing here
+ * because playSong() sets a single media item, not a playlist.
  */
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
+    private var standbyPlayer: ExoPlayer? = null
 
     override fun onCreate() {
         super.onCreate()
         FileLogger.info("PlaybackService", "onCreate")
 
-        // Media3 notification provider (channel + icon)
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider.Builder(this)
                 .setChannelId("smart_music_playback")
@@ -35,7 +35,7 @@ class PlaybackService : MediaSessionService() {
         val player: Player = if (instance != null) {
             instance.exoPlayer
         } else {
-            ExoPlayer.Builder(this).build()
+            ExoPlayer.Builder(this).build().also { standbyPlayer = it }
         }
 
         mediaSession = MediaSession.Builder(this, player)
@@ -44,13 +44,14 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        FileLogger.info("PlaybackService", "onStartCommand action=${intent?.action}")
+        FileLogger.info("PlaybackService", "onStartCommand")
 
-        // Rebind session if SmartAudioPlayer initialized after service
         val instance = SmartAudioPlayer.instance
         if (instance != null && mediaSession?.player !== instance.exoPlayer) {
-            FileLogger.info("PlaybackService", "Rebinding session to real ExoPlayer")
+            FileLogger.info("PlaybackService", "Rebinding to real ExoPlayer, releasing standby")
             mediaSession?.release()
+            standbyPlayer?.release()
+            standbyPlayer = null
             mediaSession = MediaSession.Builder(this, instance.exoPlayer)
                 .setCallback(MediaCallback())
                 .build()
@@ -58,34 +59,28 @@ class PlaybackService : MediaSessionService() {
         return super.onStartCommand(intent, flags, startId)
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
-        return mediaSession
-    }
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        val player = mediaSession?.player
-        if (player == null || !player.playWhenReady || player.mediaItemCount == 0) {
-            stopSelf()
-        }
+        val p = mediaSession?.player
+        if (p == null || !p.playWhenReady || p.mediaItemCount == 0) stopSelf()
     }
 
     override fun onDestroy() {
-        mediaSession?.run {
-            player.release()
-            release()
-            mediaSession = null
+        FileLogger.info("PlaybackService", "onDestroy")
+        mediaSession?.let { session ->
+            // Only release if the player is NOT SmartAudioPlayer.exoPlayer
+            val shared = session.player === SmartAudioPlayer.instance?.exoPlayer
+            session.release()
+            if (!shared) {
+                runCatching { session.player.release() }
+            }
         }
+        mediaSession = null
+        standbyPlayer = null
         super.onDestroy()
     }
 
-    /**
-     * Explicit media-button handling.
-     *
-     * Media3 default behavior is usually fine, but on Android 12–15 some
-     * Bluetooth stacks send KeyEvents that Media3 does NOT auto-handle
-     * (e.g. some headsets emit KEYCODE_HEADSETHOOK for play/pause, and
-     * double-tap of PLAY_PAUSE is not always routed to onSkipToNext).
-     */
     private inner class MediaCallback : MediaSession.Callback {
 
         override fun onMediaButtonEvent(
@@ -95,58 +90,38 @@ class PlaybackService : MediaSessionService() {
         ): Boolean {
             val key = intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, KeyEvent::class.java)
                 ?: return super.onMediaButtonEvent(session, controllerInfo, intent)
-
             if (key.action != KeyEvent.ACTION_DOWN) return true
 
             FileLogger.info("PlaybackService", "key=${key.keyCode} repeat=${key.repeatCount}")
 
-            val player = session.player
+            val instance = SmartAudioPlayer.instance
+            if (instance == null) {
+                // No SmartAudioPlayer — fall back to raw player
+                return when (key.keyCode) {
+                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                    KeyEvent.KEYCODE_HEADSETHOOK -> {
+                        if (session.player.isPlaying) session.player.pause() else session.player.play()
+                        true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_PLAY -> { session.player.play(); true }
+                    KeyEvent.KEYCODE_MEDIA_PAUSE -> { session.player.pause(); true }
+                    else -> super.onMediaButtonEvent(session, controllerInfo, intent)
+                }
+            }
+
             return when (key.keyCode) {
                 KeyEvent.KEYCODE_MEDIA_NEXT,
-                KeyEvent.KEYCODE_MEDIA_SKIP_FORWARD -> {
-                    player.seekToNextMediaItem()
-                    true
-                }
+                KeyEvent.KEYCODE_MEDIA_SKIP_FORWARD -> { instance.skipNext(isManual = true); true }
                 KeyEvent.KEYCODE_MEDIA_PREVIOUS,
-                KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD -> {
-                    player.seekToPreviousMediaItem()
-                    true
-                }
+                KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD -> { instance.skipPrevious(); true }
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-                KeyEvent.KEYCODE_HEADSETHOOK -> {
-                    if (player.isPlaying) player.pause() else player.play()
-                    true
-                }
-                KeyEvent.KEYCODE_MEDIA_PLAY -> {
-                    player.play()
-                    true
-                }
-                KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                    player.pause()
-                    true
-                }
-                KeyEvent.KEYCODE_MEDIA_STOP -> {
-                    player.pause()
-                    true
-                }
+                KeyEvent.KEYCODE_HEADSETHOOK -> { instance.togglePlayPause(); true }
+                KeyEvent.KEYCODE_MEDIA_PLAY -> { instance.resume(); true }
+                KeyEvent.KEYCODE_MEDIA_PAUSE -> { instance.pause(); true }
+                KeyEvent.KEYCODE_MEDIA_STOP -> { instance.pause(); true }
                 else -> super.onMediaButtonEvent(session, controllerInfo, intent)
             }
         }
 
-        override fun onPlay() {
-            mediaSession?.player?.play()
-        }
-
-        override fun onPause() {
-            mediaSession?.player?.pause()
-        }
-
-        override fun onSkipToNext() {
-            mediaSession?.player?.seekToNextMediaItem()
-        }
-
-        override fun onSkipToPrevious() {
-            mediaSession?.player?.seekToPreviousMediaItem()
-        }
     }
 }

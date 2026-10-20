@@ -188,6 +188,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             allSongs.collect { songs ->
                 val musicOnly = songs.filter { !it.isPodcastOrAudiobook }
                 player.currentPlaylist = musicOnly
+                player.ensureQueueInitialized(musicOnly)
                 player.restoreLastSong(musicOnly)
             }
         }
@@ -224,7 +225,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun fetchLyricsForCurrent() {
-        player.currentSong.value?.let { player.fetchLyricsForSong(it) }
+        player.currentSong.value?.let { player.fetchLyricsForSong(it, force = true) }
     }
 
     fun setShowSettings(show: Boolean) {
@@ -325,7 +326,9 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun playPodcast(song: Song) {
-        player.currentPlaylist = podcastAndAudiobooks.value
+        val podcasts = podcastAndAudiobooks.value
+        player.currentPlaylist = podcasts
+        player.setQueue(podcasts)
         player.playSong(song)
     }
 
@@ -333,6 +336,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val songs = favoriteSongs.value
         if (songs.isNotEmpty()) {
             player.currentPlaylist = songs
+            player.setQueue(songs)
             player.playSong(songs.first())
         }
     }
@@ -342,8 +346,10 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun togglePlayPause() {
-        if (player.currentSong.value == null && allSongs.value.isNotEmpty()) {
-            player.playSong(allSongs.value.first())
+        if (player.currentSong.value == null) {
+            val fallback = player.currentPlaylist.firstOrNull()
+                ?: allSongs.value.firstOrNull { !it.isPodcastOrAudiobook }
+            if (fallback != null) player.playSong(fallback)
         } else {
             player.togglePlayPause()
         }
@@ -462,6 +468,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val selected = allSongs.value.filter { _uiState.value.selectedSongIds.contains(it.id) }
         if (selected.isNotEmpty()) {
             player.currentPlaylist = selected
+            player.setQueue(selected)
             player.playSong(selected.first())
             toggleSelectionMode(false)
         }
@@ -536,8 +543,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             val songs = playlistRepository.getSongsForPlaylist(playlist)
             if (songs.isNotEmpty()) {
                 player.currentPlaylist = songs
-                player.clearQueue()
-                songs.forEach { player.addToQueue(it) }
+                player.setQueue(songs)
                 player.playSong(songs.first())
             }
         }
