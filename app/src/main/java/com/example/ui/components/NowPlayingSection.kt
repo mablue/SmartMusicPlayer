@@ -543,9 +543,10 @@ fun FullPlayerContent(
         Spacer(modifier = Modifier.height(12.dp))
 
         // Chips Row: Playback Mode, Speed, and Sleep Timer
-        Row(
+        androidx.compose.foundation.lazy.LazyRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Playback Mode Chip with Dropdown
@@ -557,7 +558,7 @@ fun FullPlayerContent(
                     border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.5f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
@@ -608,8 +609,6 @@ fun FullPlayerContent(
                 }
             }
 
-            Spacer(modifier = Modifier.width(6.dp))
-
             // Playback Speed Chip with Dropdown
             Box {
                 Surface(
@@ -619,7 +618,7 @@ fun FullPlayerContent(
                     border = BorderStroke(1.dp, NeonAmber.copy(alpha = 0.5f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
@@ -634,7 +633,7 @@ fun FullPlayerContent(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
-                            )
+                            ), maxLines = 1, softWrap = false
                         )
                     }
                 }
@@ -662,8 +661,6 @@ fun FullPlayerContent(
                 }
             }
 
-            Spacer(modifier = Modifier.width(6.dp))
-
             // Sleep Timer Chip with Dropdown
             Box {
                 Surface(
@@ -673,7 +670,7 @@ fun FullPlayerContent(
                     border = BorderStroke(1.dp, if (sleepTimerMinutes > 0) NeonEmerald else DarkSurfaceBorder)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
@@ -720,8 +717,6 @@ fun FullPlayerContent(
                 }
             }
 
-            Spacer(modifier = Modifier.width(6.dp))
-
             // A-B Repeat Loop Chip with Dropdown
             Box {
                 Surface(
@@ -731,7 +726,7 @@ fun FullPlayerContent(
                     border = BorderStroke(1.dp, if (isABLoopActive) Color(0xFFF472B6) else DarkSurfaceBorder)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
@@ -742,7 +737,7 @@ fun FullPlayerContent(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = if (isABLoopActive) "A-B ON" else "A-B",
+                            text = "A-B",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = if (isABLoopActive) Color(0xFFF472B6) else Color(0xFFCBD5E1)
@@ -876,78 +871,6 @@ fun FullPlayerContent(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-
-        // Live Algorithm Simulator Bar
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = DarkSurfaceVariant,
-            border = BorderStroke(1.dp, DarkSurfaceBorder),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = stringResource(R.string.live_test_title),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = Color(0xFFCBD5E1),
-                        fontWeight = FontWeight.Bold
-                    ),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilledTonalButton(
-                        onClick = onSimulateQuickSkip,
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = NeonRose.copy(alpha = 0.2f),
-                            contentColor = NeonRose
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.test_quick_skip),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    FilledTonalButton(
-                        onClick = onSimulateModerateListen,
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = NeonAmber.copy(alpha = 0.2f),
-                            contentColor = NeonAmber
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.test_moderate),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    FilledTonalButton(
-                        onClick = onSimulateFullListen,
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = NeonEmerald.copy(alpha = 0.2f),
-                            contentColor = NeonEmerald
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.test_full_play),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
 
         Spacer(modifier = Modifier.height(24.dp))
     }

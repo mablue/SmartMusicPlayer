@@ -106,7 +106,6 @@ import com.example.ui.components.AlgorithmInspectorDialog
 import com.example.ui.components.AnalyticsTab
 import com.example.ui.components.CarModeDialog
 import com.example.ui.components.EditSongTagsDialog
-import com.example.ui.components.EvaluationBanner
 import com.example.ui.components.FullPlayerContent
 import com.example.ui.components.LyricsViewDialog
 import com.example.ui.components.MiniPlayerBar
@@ -356,12 +355,6 @@ fun HomeScreen(
                                             color = Color.White
                                         )
                                     )
-                                    Text(
-                                        text = stringResource(R.string.app_subtitle),
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            color = NeonCyan,
-                                            fontSize = 11.sp
-                                        )
                                     )
                                 }
                             }
@@ -528,10 +521,6 @@ fun HomeScreen(
             ) {
 
                 // Live evaluation feedback
-                EvaluationBanner(
-                    evaluation = lastEvaluation,
-                    onDismiss = { viewModel.dismissEvaluation() }
-                )
                 // Scan result feedback banner
                 uiState.scanResultMsg?.let { msg ->
                     Card(
