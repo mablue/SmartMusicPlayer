@@ -149,13 +149,17 @@ class SmartAudioPlayer(
     private fun startMediaSessionService() {
         try {
             val svcIntent = Intent(context, PlaybackService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(svcIntent)
-            } else {
-                context.startService(svcIntent)
-            }
+            // SAFETY: use startService, NOT startForegroundService.
+            // startForegroundService requires startForeground() within 5-30s.
+            // Media3 will call startForeground itself when playback becomes
+            // active — but if that fails, Android kills the app. Using
+            // startService avoids the timeout entirely. Playback continues,
+            // we just lose foreground priority (acceptable trade-off).
+            context.startService(svcIntent)
+            FileLogger.info(TAG, "PlaybackService.startService OK")
         } catch (e: Exception) {
-            Log.w(TAG, "Could not start PlaybackService: ${e.message}")
+            FileLogger.warn(TAG, "startService failed: ${e.message}")
+            Log.w(TAG, "startService failed: ${e.message}")
         }
     }
 
