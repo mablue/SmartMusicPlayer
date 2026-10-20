@@ -144,11 +144,11 @@ fun LyricsPanel(
                     onClick = onDismiss,
                     colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "关闭歌词")
+                    Icon(Icons.Default.Close, contentDescription = "بستن")
                 }
 
                 Text(
-                    text = if (isTranslating) "翻译中…" else "歌词",
+                    text = if (isTranslating) "翻译中…" else "متن آهنگ",
                     style = MaterialTheme.typography.titleMedium.copy(
                         color = Color.White.copy(alpha = 0.85f),
                         fontWeight = FontWeight.SemiBold
@@ -160,14 +160,14 @@ fun LyricsPanel(
                         icon = Icons.Default.Search,
                         active = autoSearchLyrics,
                         tint = NeonCyan,
-                        desc = "自动搜索歌词",
+                        desc = "جستجوی خودکار",
                         onClick = onToggleAutoSearch
                     )
                     LyricsToggleIcon(
                         icon = Icons.Default.Translate,
                         active = autoTranslateLyrics,
                         tint = NeonViolet,
-                        desc = "自动翻译",
+                        desc = "ترجمه‌ی خودکار",
                         onClick = onToggleAutoTranslate
                     )
                 }
@@ -209,7 +209,7 @@ fun LyricsPanel(
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                text = if (autoSearchLyrics) "正在搜索歌词…" else "未找到歌词",
+                                text = if (autoSearchLyrics) "در حال جستجو…" else "متنی یافت نشد",
                                 style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.7f))
                             )
                             if (autoSearchLyrics) {
@@ -220,7 +220,7 @@ fun LyricsPanel(
                                     onClick = onRetryFetch
                                 ) {
                                     Text(
-                                        text = "重新搜索",
+                                        text = "تلاش مجدد",
                                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
                                         color = NeonCyan,
                                         fontWeight = FontWeight.Bold

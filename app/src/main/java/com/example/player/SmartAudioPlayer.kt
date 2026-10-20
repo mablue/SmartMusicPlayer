@@ -21,6 +21,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import com.example.data.lyrics.LyricLine
 import com.example.data.lyrics.LyricsResult
@@ -32,6 +36,8 @@ class SmartAudioPlayer(
     private val coroutineScope: CoroutineScope
 ) {
     private val TAG = "SmartAudioPlayer"
+    private var lyricsJob: Job? = null
+    private var translateJob: Job? = null
 
     // ---------- ExoPlayer ----------
 
@@ -490,8 +496,8 @@ class SmartAudioPlayer(
     }
 
     fun fetchLyricsForSong(song: Song, force: Boolean = false) {
-        coroutineScope.launch(Dispatchers.IO) {
-            // Honor auto-search toggle (only skip network if no cache unless forced)
+        lyricsJob?.cancel()
+        lyricsJob = coroutineScope.launch(Dispatchers.IO) {
             if (!force && !prefs.isLyricsAutoSearchEnabled) {
                 val cached = repository.getCachedLyrics(song.id)
                 if (cached == null) {
@@ -502,7 +508,6 @@ class SmartAudioPlayer(
 
             _isFetchingLyrics.value = true
 
-            // 1) Cache
             val cached = repository.getCachedLyrics(song.id)
             if (cached != null) {
                 val (plain, synced, translated) = cached
@@ -515,9 +520,14 @@ class SmartAudioPlayer(
                 }
                 if (baseLines.isNotEmpty()) {
                     val finalLines = if (translated.isNotBlank()) {
-                        val trans = translated.lines()
+                        val trans: List<String?> = if (translated.contains("\u001F")) {
+                            translated.split("\u001F").map { if (it == "\u0000") null else it }
+                        } else {
+                            // legacy cache: line-based, blank = null
+                            translated.lines().map { it.ifBlank { null } }
+                        }
                         baseLines.mapIndexed { idx, l ->
-                            l.copy(translatedText = trans.getOrNull(idx)?.takeIf { it.isNotBlank() })
+                            l.copy(translatedText = trans.getOrNull(idx))
                         }
                     } else baseLines
 
@@ -537,16 +547,15 @@ class SmartAudioPlayer(
                 }
             }
 
-            // 2) Fetch from APIs
             val lyrics = LyricsService.fetchLyrics(
                 artist = song.artist,
                 title = song.title,
                 durationSec = song.durationMs / 1000
             )
+            if (!isActive) return@launch
             _lyricsResult.value = lyrics
             _isFetchingLyrics.value = false
 
-            // 3) Cache — reconstruct LRC from lines to preserve timestamps
             if (lyrics != null) {
                 val plainText = lyrics.lines.joinToString("\n") { it.text }
                 val syncedText = if (lyrics.isSynced) {
@@ -571,28 +580,53 @@ class SmartAudioPlayer(
     fun translateCurrentLyrics(targetLang: String) {
         val current = _lyricsResult.value ?: return
         val songId = _currentSong.value?.id ?: return
-        coroutineScope.launch(Dispatchers.IO) {
+        translateJob?.cancel()
+        translateJob = coroutineScope.launch(Dispatchers.IO) {
             _isTranslatingLyrics.value = true
-            val translatedLines = current.lines.map { line ->
-                val t = LyricsService.translateText(line.text, targetLang)
-                line.copy(translatedText = t)
+            val result = ArrayList<LyricLine>(current.lines.size)
+
+            // Parallel in batches of 5 — 100 lines = 20 batches × ~1s = ~20s max,
+            // not 100 sequential requests. Each line is still isolated so a
+            // failed translate returns null and cannot corrupt neighbours.
+            for (chunk in current.lines.chunked(5)) {
+                if (!isActive) return@launch
+                val batch = chunk.map { line ->
+                    async(Dispatchers.IO) {
+                        val t = LyricsService.translateText(line.text, targetLang)
+                        line.copy(translatedText = t)
+                    }
+                }.awaitAll()
+                result.addAll(batch)
             }
-            _lyricsResult.value = current.copy(lines = translatedLines)
+
+            _lyricsResult.value = current.copy(lines = result)
             _isTranslatingLyrics.value = false
 
-            // Persist translation block
+            // Persist with unit-separator + null marker so translation rows
+            // stay aligned with lyric rows even if some are null.
             val plain = current.lines.joinToString("\n") { it.text }
             val synced = if (current.isSynced) current.plainText else ""
-            val transBlock = translatedLines.joinToString("\n") { it.translatedText ?: "" }
+            val transBlock = result.joinToString("\u001F") { it.translatedText ?: "\u0000" }
             repository.cacheLyrics(songId, plain, synced, transBlock)
-            Log.d(TAG, "Cached translation for song $songId")
+            Log.d(TAG, "Cached translation for song $songId (${result.size} lines)")
         }
     }
 
     fun ensureQueueInitialized(playlist: List<Song>) {
-        if (_queue.value.isEmpty() && playlist.isNotEmpty()) {
+        if (playlist.isEmpty()) return
+        val current = _queue.value
+        if (current.isEmpty()) {
             _queue.value = playlist
             FileLogger.info(TAG, "Queue initialized with ${playlist.size} songs")
+            return
+        }
+        // Merge: append any new songs (from a fresh scan) without losing
+        // the existing order or duplicating entries.
+        val existingIds = current.map { it.id }.toHashSet()
+        val fresh = playlist.filter { it.id !in existingIds }
+        if (fresh.isNotEmpty()) {
+            _queue.value = current + fresh
+            FileLogger.info(TAG, "Queue merged: +${fresh.size} new songs (total ${_queue.value.size})")
         }
     }
 

@@ -342,6 +342,14 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun playSong(song: Song) {
+        // If the song isn't in the current playlist context (user was in
+        // Podcasts or a Playlist and now taps a Library song), reset the
+        // context to the music-only library so skipNext stays in Library.
+        if (player.currentPlaylist.none { it.id == song.id }) {
+            val musicOnly = allSongs.value.filter { !it.isPodcastOrAudiobook }
+            player.currentPlaylist = musicOnly
+            player.setQueue(musicOnly)
+        }
         player.playSong(song)
     }
 
