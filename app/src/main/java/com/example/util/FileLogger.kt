@@ -9,15 +9,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Persistent file-based logger.
- *
- * - Writes to: /sdcard/Android/data/<pkg>/files/smartmusic_logs/errors.log
- * - Appends (does NOT truncate) — previous session logs are preserved
- * - Auto-creates the directory/file if missing
- * - Rotates if file exceeds 2MB (keeps last ~1MB)
- * - Installs a global UncaughtExceptionHandler so crashes are logged
- */
 object FileLogger {
     private const val TAG = "FileLogger"
     private const val LOG_DIR = "smartmusic_logs"
@@ -37,7 +28,6 @@ object FileLogger {
         val f = File(dir, LOG_FILE)
         file = f
 
-        // Rotate if too large
         if (f.exists() && f.length() > MAX_BYTES) {
             try {
                 val tail = f.readText().takeLast((MAX_BYTES / 2).toInt())
@@ -45,14 +35,12 @@ object FileLogger {
             } catch (_: Exception) {}
         }
 
-        // Install crash handler
         val prev = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             error("CRASH", "Uncaught on thread=${thread.name}", throwable)
             prev?.uncaughtException(thread, throwable)
         }
 
-        // Session header
         appendLine("")
         appendLine("=========== SESSION ${now()} ===========")
         appendLine("Device  : ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
