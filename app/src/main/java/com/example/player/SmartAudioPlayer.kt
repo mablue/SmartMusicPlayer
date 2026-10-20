@@ -38,6 +38,8 @@ class SmartAudioPlayer(
     private val TAG = "SmartAudioPlayer"
     private var lyricsJob: Job? = null
     private var translateJob: Job? = null
+    @Volatile private var lyricsGeneration: Long = 0L
+    @Volatile private var translateGeneration: Long = 0L
 
     // ---------- ExoPlayer ----------
 
@@ -496,6 +498,7 @@ class SmartAudioPlayer(
     }
 
     fun fetchLyricsForSong(song: Song, force: Boolean = false) {
+        val gen = ++lyricsGeneration
         lyricsJob?.cancel()
         lyricsJob = coroutineScope.launch(Dispatchers.IO) {
             if (!force && !prefs.isLyricsAutoSearchEnabled) {
@@ -518,11 +521,16 @@ class SmartAudioPlayer(
                             LyricLine(timestampMs = idx * 4000L, text = line.trim())
                         }
                     }
-                    // Only trust translations in new-format caches (U+001F).
-                    // Old format used '\n', which dropped nulls and shifted rows.
+
+                    // Trust translations only in new format AND only if at least
+                    // one line has non-null translation. All-null means the last
+                    // attempt failed (e.g. offline) — retry.
                     val transValid: List<String?>? =
                         if (translated.isNotBlank() && translated.contains("\u001F")) {
-                            translated.split("\u001F").map { if (it == "\u0000") null else it }
+                            val list = translated.split("\u001F").map {
+                                if (it == "\u0000") null else it
+                            }
+                            if (list.all { it == null }) null else list
                         } else null
 
                     if (baseLines.isNotEmpty()) {
@@ -532,12 +540,14 @@ class SmartAudioPlayer(
                             }
                         } else baseLines
 
-                        _lyricsResult.value = LyricsResult(
-                            lines = finalLines,
-                            isSynced = synced.isNotBlank(),
-                            source = "Cache",
-                            plainText = plain
-                        )
+                        if (gen == lyricsGeneration) {
+                            _lyricsResult.value = LyricsResult(
+                                lines = finalLines,
+                                isSynced = synced.isNotBlank(),
+                                source = "Cache",
+                                plainText = plain
+                            )
+                        }
                         Log.d(TAG, "Cache hit for '${song.title}' (trans=${transValid != null})")
 
                         if (transValid == null && prefs.isLyricsTranslationEnabled) {
@@ -552,7 +562,7 @@ class SmartAudioPlayer(
                     title = song.title,
                     durationSec = song.durationMs / 1000
                 )
-                if (!isActive) return@launch
+                if (!isActive || gen != lyricsGeneration) return@launch
                 _lyricsResult.value = lyrics
 
                 if (lyrics != null) {
@@ -574,7 +584,9 @@ class SmartAudioPlayer(
                     translateCurrentLyrics(prefs.targetTranslationLanguage)
                 }
             } finally {
-                _isFetchingLyrics.value = false
+                if (gen == lyricsGeneration) {
+                    _isFetchingLyrics.value = false
+                }
             }
         }
     }
@@ -582,13 +594,14 @@ class SmartAudioPlayer(
     fun translateCurrentLyrics(targetLang: String) {
         val current = _lyricsResult.value ?: return
         val songId = _currentSong.value?.id ?: return
+        val gen = ++translateGeneration
         translateJob?.cancel()
         translateJob = coroutineScope.launch(Dispatchers.IO) {
             _isTranslatingLyrics.value = true
             try {
                 val result = ArrayList<LyricLine>(current.lines.size)
                 for (chunk in current.lines.chunked(5)) {
-                    if (!isActive) return@launch
+                    if (!isActive || gen != translateGeneration) return@launch
                     val batch = chunk.map { line ->
                         async(Dispatchers.IO) {
                             val t = LyricsService.translateText(line.text, targetLang)
@@ -597,14 +610,19 @@ class SmartAudioPlayer(
                     }.awaitAll()
                     result.addAll(batch)
                 }
+                if (gen != translateGeneration) return@launch
                 _lyricsResult.value = current.copy(lines = result)
                 val plain = current.lines.joinToString("\n") { it.text }
                 val synced = if (current.isSynced) current.plainText else ""
-                val transBlock = result.joinToString("\u001F") { it.translatedText ?: "\u0000" }
+                val transBlock = result.joinToString("\u001F") {
+                    it.translatedText ?: "\u0000"
+                }
                 repository.cacheLyrics(songId, plain, synced, transBlock)
                 Log.d(TAG, "Cached translation for song $songId (${result.size} lines)")
             } finally {
-                _isTranslatingLyrics.value = false
+                if (gen == translateGeneration) {
+                    _isTranslatingLyrics.value = false
+                }
             }
         }
     }
@@ -623,6 +641,7 @@ class SmartAudioPlayer(
 
     fun onSongDeleted(deletedId: Long) {
         _queue.value = _queue.value.filter { it.id != deletedId }
+        currentPlaylist = currentPlaylist.filter { it.id != deletedId }
         if (_currentSong.value?.id == deletedId) {
             val wasPlaying = _isPlaying.value
             exoPlayer.stop()
@@ -635,8 +654,17 @@ class SmartAudioPlayer(
     }
 
     fun release() {
+        lyricsJob?.cancel()
+        translateJob?.cancel()
         exoPlayer.release()
         audioEffectManager.release()
+        _queue.value = emptyList()
+        currentPlaylist = emptyList()
+        _currentSong.value = null
+        _lyricsResult.value = null
+        _isPlaying.value = false
+        _isFetchingLyrics.value = false
+        _isTranslatingLyrics.value = false
         instance = null
     }
 

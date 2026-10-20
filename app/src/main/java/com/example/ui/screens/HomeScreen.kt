@@ -706,6 +706,11 @@ fun HomeScreen(
         )
     }
 
+    // Back handler closes lyrics panel first
+    BackHandler(enabled = uiState.showLyricsPanel) {
+        viewModel.toggleLyricsPanel()
+    }
+
     // Full-screen Lyrics Panel (Apple Music style)
     if (uiState.showLyricsPanel) {
         LyricsPanel(
