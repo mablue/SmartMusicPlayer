@@ -170,7 +170,7 @@ android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
 
 نقشه راه و محدودیت‌ها
 
-· پوشش لیریک فارسی / ترکی ضعیف است: LRCLIB و Lyrica داده محدودی دارند و هنوز API عمومی لیریک فارسی وصل نشده است.
+· پوشش لیریک فارسی / ترکی ضعیف است: داده‌های LRCLIB و Lyrica محدودند و هنوز API عمومی لیریک فارسی وصل نشده است.
 · ReplayGain کلاس‌هایش وجود دارد ولی پردازنده صوتی برای عملکرد غیرفعال شده است.
 · Wave control (WaveControlManager، سنسور مجاورت) وجود دارد ولی در تنظیمات نمایش داده نمی‌شود.
 · کامپوننت‌های مرده: AnalyticsTab، RankingsTabContent، DiscoveryTabContent، LyricsViewDialog وجود دارند ولی به ناوبری وصل نیستند.
