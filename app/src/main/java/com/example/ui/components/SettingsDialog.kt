@@ -287,7 +287,7 @@ fun SettingsDialog(
                         )
                         Text(
                             text = "Adaptive AI Ranking • Live Lyrics • Per-Track Resume",
-                            style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF64748B), fontSize = 10.sp)
+                            style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF64748B), fontSize = 11.sp)
                         )
                     }
                 }
@@ -346,13 +346,13 @@ private fun SettingsToggleItem(
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = tint.copy(alpha = 0.15f),
-                    modifier = Modifier.size(34.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         tint = tint,
-                        modifier = Modifier.padding(7.dp)
+                        modifier = Modifier.padding(8.dp)
                     )
                 }
                 Column {
@@ -367,7 +367,7 @@ private fun SettingsToggleItem(
                         text = subtitle,
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = Color(0xFF94A3B8),
-                            fontSize = 10.sp
+                            fontSize = 11.sp
                         )
                     )
                 }

@@ -305,7 +305,7 @@ private fun StatCard(
             Surface(
                 shape = CircleShape,
                 color = color.copy(alpha = 0.15f),
-                modifier = Modifier.size(38.dp)
+                modifier = Modifier.size(40.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(

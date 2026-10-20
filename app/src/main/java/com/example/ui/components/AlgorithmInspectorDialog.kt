@@ -113,7 +113,7 @@ fun AlgorithmInspectorDialog(
                         )
                     }
 
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = androidx.compose.ui.res.stringResource(com.example.R.string.btn_dismiss),
@@ -276,7 +276,7 @@ private fun MetricBox(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     color = Color(0xFFCBD5E1)
                 ),
                 maxLines = 1

@@ -174,7 +174,7 @@ fun SongListItem(
                 ) {
                     Text(
                         text = song.title,
-                        style = MaterialTheme.typography.bodyMedium.copy(
+                        style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = if (isCurrentSong) FontWeight.Bold else FontWeight.Medium,
                             color = if (isCurrentSong) NeonCyan else Color.White,
                             fontSize = 13.sp
@@ -195,7 +195,7 @@ fun SongListItem(
                             } else {
                                 "${song.score.toInt()}"
                             },
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = tierColor,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
@@ -209,7 +209,7 @@ fun SongListItem(
                         ) {
                             Text(
                                 text = "⏱️ ${song.formattedResumePosition}",
-                                fontSize = 9.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NeonCyan,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
@@ -227,7 +227,7 @@ fun SongListItem(
                 ) {
                     Text(
                         text = song.artist,
-                        style = MaterialTheme.typography.bodySmall.copy(
+                        style = MaterialTheme.typography.bodyMedium.copy(
                             color = Color(0xFF94A3B8),
                             fontSize = 11.sp
                         ),
@@ -236,30 +236,30 @@ fun SongListItem(
                         modifier = Modifier.weight(1f, fill = false)
                     )
 
-                    Text(text = "•", color = Color(0xFF64748B), fontSize = 9.sp)
+                    Text(text = "•", color = Color(0xFF64748B), fontSize = 11.sp)
 
                     Text(
                         text = song.formattedDuration,
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = Color(0xFF64748B),
-                            fontSize = 10.sp
+                            fontSize = 11.sp
                         )
                     )
 
                     if (song.playCount > 0) {
-                        Text(text = "•", color = Color(0xFF64748B), fontSize = 9.sp)
+                        Text(text = "•", color = Color(0xFF64748B), fontSize = 11.sp)
                         Text(
                             text = "🎧${song.playCount}",
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             color = NeonEmerald
                         )
                     }
 
                     if (song.skipCount > 0) {
-                        Text(text = "•", color = Color(0xFF64748B), fontSize = 9.sp)
+                        Text(text = "•", color = Color(0xFF64748B), fontSize = 11.sp)
                         Text(
                             text = "⏭️${song.skipCount}",
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             color = NeonRose
                         )
                     }
@@ -406,7 +406,7 @@ fun SongListItem(
                 IconButton(
                     onClick = onSongClick,
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(32.dp)
                         .background(
                             if (isCurrentSong) tierColor else Color.White.copy(alpha = 0.08f),
                             CircleShape

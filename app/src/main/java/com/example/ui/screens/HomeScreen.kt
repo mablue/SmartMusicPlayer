@@ -336,7 +336,7 @@ fun HomeScreen(
                                 Surface(
                                     shape = CircleShape,
                                     color = NeonViolet.copy(alpha = 0.2f),
-                                    modifier = Modifier.size(34.dp)
+                                    modifier = Modifier.size(32.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
@@ -1122,7 +1122,7 @@ private fun RankingsTabContent(
                     modifier = Modifier.padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(shape = CircleShape, color = NeonAmber.copy(alpha = 0.2f), modifier = Modifier.size(34.dp)) {
+                    Surface(shape = CircleShape, color = NeonAmber.copy(alpha = 0.2f), modifier = Modifier.size(32.dp)) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(Icons.Default.Star, contentDescription = null, tint = NeonAmber, modifier = Modifier.size(20.dp))
                         }
@@ -1164,7 +1164,7 @@ private fun RankingsTabContent(
                     Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = "#$rankNumber",
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = rankBadgeColor
                         )
@@ -1219,7 +1219,7 @@ private fun DiscoveryTabContent(
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(shape = CircleShape, color = NeonViolet.copy(alpha = 0.2f), modifier = Modifier.size(34.dp)) {
+                        Surface(shape = CircleShape, color = NeonViolet.copy(alpha = 0.2f), modifier = Modifier.size(32.dp)) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(Icons.Default.Explore, contentDescription = null, tint = NeonViolet, modifier = Modifier.size(20.dp))
                             }

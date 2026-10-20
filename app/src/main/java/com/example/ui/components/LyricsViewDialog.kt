@@ -117,14 +117,14 @@ fun LyricsViewDialog(
                         Surface(
                             shape = CircleShape,
                             color = NeonCyan.copy(alpha = 0.2f),
-                            modifier = Modifier.size(38.dp)
+                            modifier = Modifier.size(40.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Subtitles,
                                     contentDescription = null,
                                     tint = NeonCyan,
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         }
@@ -148,7 +148,7 @@ fun LyricsViewDialog(
                         }
                     }
 
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = stringResource(R.string.btn_dismiss),
@@ -173,7 +173,7 @@ fun LyricsViewDialog(
                     ) {
                         Text(
                             text = if (lyricsResult?.isSynced == true) stringResource(R.string.lyrics_synced_hud) else stringResource(R.string.lyrics_plain_text),
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (lyricsResult?.isSynced == true) NeonEmerald else Color(0xFF94A3B8),
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)

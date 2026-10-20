@@ -112,7 +112,7 @@ fun FoldersTabContent(
                 Surface(
                     shape = CircleShape,
                     color = NeonEmerald.copy(alpha = 0.2f),
-                    modifier = Modifier.size(34.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
@@ -258,7 +258,7 @@ private fun FolderCard(
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = NeonCyan.copy(alpha = 0.15f),
-                modifier = Modifier.size(46.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(

@@ -113,14 +113,14 @@ fun PodcastsTabContent(
                 Surface(
                     shape = CircleShape,
                     color = ElectricBlue.copy(alpha = 0.2f),
-                    modifier = Modifier.size(38.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Headphones,
                             contentDescription = null,
                             tint = ElectricBlue,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
@@ -342,7 +342,7 @@ private fun PodcastEpisodeCard(
                     modifier = Modifier.size(44.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        IconButton(onClick = onPlayClick, modifier = Modifier.size(36.dp)) {
+                        IconButton(onClick = onPlayClick, modifier = Modifier.size(48.dp)) {
                             Icon(
                                 imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                 contentDescription = null,
@@ -378,7 +378,7 @@ private fun PodcastEpisodeCard(
                 }
 
                 Box {
-                    IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = { showMenu = true }, modifier = Modifier.size(48.dp)) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = null,
@@ -440,7 +440,7 @@ private fun PodcastEpisodeCard(
                 ) {
                     Text(
                         text = song.genre,
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (song.genre.equals("Audiobook", ignoreCase = true)) NeonAmber else ElectricBlue,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -463,7 +463,7 @@ private fun PodcastEpisodeCard(
                     ) {
                         Text(
                             text = "⏱️ ${song.formattedResumePosition}",
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = NeonViolet,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -475,7 +475,7 @@ private fun PodcastEpisodeCard(
 
                 if (isCurrent) {
                     // Quick skip buttons
-                    IconButton(onClick = onRewind15, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onRewind15, modifier = Modifier.size(48.dp)) {
                         Icon(
                             imageVector = Icons.Default.FastRewind,
                             contentDescription = "-15s",
@@ -483,7 +483,7 @@ private fun PodcastEpisodeCard(
                             modifier = Modifier.size(18.dp)
                         )
                     }
-                    IconButton(onClick = onForward30, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onForward30, modifier = Modifier.size(48.dp)) {
                         Icon(
                             imageVector = Icons.Default.FastForward,
                             contentDescription = "+30s",

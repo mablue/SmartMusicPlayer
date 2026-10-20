@@ -164,10 +164,10 @@ fun MiniPlayerBar(
                                 } else {
                                     androidx.compose.ui.res.stringResource(com.example.R.string.tier_rank_badge, song.score.toInt())
                                 },
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = tierColor,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }
                     }
@@ -191,7 +191,7 @@ fun MiniPlayerBar(
                 IconButton(
                     onClick = onTogglePlayPause,
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(40.dp)
                         .background(NeonCyan, CircleShape)
                         .testTag("mini_player_play_pause")
                 ) {
@@ -203,7 +203,7 @@ fun MiniPlayerBar(
                             androidx.compose.ui.res.stringResource(com.example.R.string.action_play)
                         },
                         tint = Color.Black,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
@@ -211,7 +211,7 @@ fun MiniPlayerBar(
                 IconButton(
                     onClick = onSkipNext,
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(40.dp)
                         .testTag("mini_player_skip")
                 ) {
                     Icon(

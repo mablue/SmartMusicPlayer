@@ -163,7 +163,7 @@ fun QueueSheet(
                                     imageVector = if (isPlaying) Icons.Default.GraphicEq else Icons.Default.MusicNote,
                                     contentDescription = null,
                                     tint = NeonCyan,
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         }
@@ -173,7 +173,7 @@ fun QueueSheet(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "در حال پخش",
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NeonCyan
                             )

@@ -396,7 +396,7 @@ fun FullPlayerContent(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = tierColor,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
 
@@ -409,7 +409,7 @@ fun FullPlayerContent(
                         text = "🎧 ${song.playCount} | ⏭️ ${song.skipCount}",
                         fontSize = 12.sp,
                         color = Color.White,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
             }
@@ -431,7 +431,7 @@ fun FullPlayerContent(
                         text = "🎵 ${song.genre}",
                         fontSize = 11.sp,
                         color = Color(0xFFCBD5E1),
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
 
@@ -445,7 +445,7 @@ fun FullPlayerContent(
                         text = "🌐 ${song.detectedLanguage}",
                         fontSize = 11.sp,
                         color = Color(0xFFCBD5E1),
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
 
@@ -459,7 +459,7 @@ fun FullPlayerContent(
                         text = "📁 ${song.folderName}",
                         fontSize = 11.sp,
                         color = Color(0xFFCBD5E1),
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                         maxLines = 1
                     )
                 }
@@ -476,7 +476,7 @@ fun FullPlayerContent(
                             text = "💾 " + stringResource(R.string.meta_size, sizeMb),
                             fontSize = 11.sp,
                             color = Color(0xFF94A3B8),
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
                 }
@@ -524,12 +524,12 @@ fun FullPlayerContent(
                     border = BorderStroke(0.5.dp, NeonCyan.copy(alpha = 0.5f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Icon(Icons.Default.RestartAlt, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(13.dp))
-                        Text(stringResource(R.string.action_restart_beginning), fontSize = 10.sp, color = NeonCyan)
+                        Text(stringResource(R.string.action_restart_beginning), fontSize = 11.sp, color = NeonCyan)
                     }
                 }
             }
@@ -558,9 +558,9 @@ fun FullPlayerContent(
                     border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.5f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         val modeIcon = when (playbackMode) {
                             PlaybackMode.SMART_SHUFFLE -> Icons.Default.AutoAwesome
@@ -788,7 +788,7 @@ fun FullPlayerContent(
         ) {
             IconButton(
                 onClick = onSkipPrevious,
-                modifier = Modifier.size(46.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipPrevious,
@@ -803,7 +803,7 @@ fun FullPlayerContent(
             // -15s Rewind
             IconButton(
                 onClick = { onSeekRelative(-15000L) },
-                modifier = Modifier.size(46.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
@@ -812,7 +812,7 @@ fun FullPlayerContent(
                         tint = Color(0xFFCBD5E1),
                         modifier = Modifier.size(24.dp)
                     )
-                    Text("15s", fontSize = 9.sp, color = Color(0xFF94A3B8))
+                    Text("15s", fontSize = 11.sp, color = Color(0xFF94A3B8))
                 }
             }
 
@@ -841,7 +841,7 @@ fun FullPlayerContent(
             // +15s Forward
             IconButton(
                 onClick = { onSeekRelative(15000L) },
-                modifier = Modifier.size(46.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
@@ -850,7 +850,7 @@ fun FullPlayerContent(
                         tint = Color(0xFFCBD5E1),
                         modifier = Modifier.size(24.dp)
                     )
-                    Text("15s", fontSize = 9.sp, color = Color(0xFF94A3B8))
+                    Text("15s", fontSize = 11.sp, color = Color(0xFF94A3B8))
                 }
             }
 
@@ -859,7 +859,7 @@ fun FullPlayerContent(
             // Next / Skip Button
             IconButton(
                 onClick = onSkipNext,
-                modifier = Modifier.size(46.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipNext,

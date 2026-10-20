@@ -98,7 +98,7 @@ fun EvaluationBanner(
                     Surface(
                         shape = CircleShape,
                         color = accentColor.copy(alpha = 0.2f),
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(

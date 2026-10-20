@@ -219,7 +219,7 @@ fun CarModeDialog(
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Icon(Icons.Default.FastRewind, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(24.dp))
-                                Text("15s", fontSize = 10.sp, color = NeonCyan, fontWeight = FontWeight.Bold)
+                                Text("15s", fontSize = 11.sp, color = NeonCyan, fontWeight = FontWeight.Bold)
                             }
                         }
 
@@ -236,7 +236,7 @@ fun CarModeDialog(
                                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                     contentDescription = if (isPlaying) stringResource(R.string.action_pause) else stringResource(R.string.action_play),
                                     tint = Color.Black,
-                                    modifier = Modifier.size(54.dp)
+                                    modifier = Modifier.size(56.dp)
                                 )
                             }
                         }
@@ -254,7 +254,7 @@ fun CarModeDialog(
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Icon(Icons.Default.FastForward, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(24.dp))
-                                Text("15s", fontSize = 10.sp, color = NeonCyan, fontWeight = FontWeight.Bold)
+                                Text("15s", fontSize = 11.sp, color = NeonCyan, fontWeight = FontWeight.Bold)
                             }
                         }
 
