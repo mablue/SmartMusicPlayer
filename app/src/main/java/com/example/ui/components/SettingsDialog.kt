@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -49,6 +50,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import com.example.util.FileLogger
+import com.example.ui.theme.DarkSurfaceBorder
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -78,6 +85,7 @@ fun SettingsDialog(
     onDismiss: () -> Unit
 ) {
     var showLangDropdown by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     val languages = listOf(
         "fa" to "فارسی (Persian)",
@@ -269,6 +277,40 @@ fun SettingsDialog(
                     Icon(Icons.Default.RestartAlt, contentDescription = null, tint = NeonRose, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.settings_reset_ranks_btn), color = NeonRose, fontSize = 12.sp)
+                }
+
+                // Share Logs button
+                OutlinedButton(
+                    onClick = {
+                        try {
+                            val file = FileLogger.getLogFile()
+                            if (file == null || !file.exists()) {
+                                android.widget.Toast.makeText(context, "لاگ هنوز ساخته نشده", android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                val uri = FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    file
+                                )
+                                val share = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    putExtra(Intent.EXTRA_SUBJECT, "SmartMusic logs")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(share, "ارسال لاگ‌ها"))
+                            }
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "خطا: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, NeonAmber.copy(alpha = 0.6f))
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, tint = NeonAmber, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("ارسال لاگ‌های خطا", color = Color.White, fontSize = 12.sp)
                 }
 
                 // App Info

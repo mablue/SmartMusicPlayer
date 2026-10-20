@@ -8,10 +8,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.screens.HomeScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.MusicPlayerViewModel
+import com.example.util.FileLogger
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        FileLogger.init(this)
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {

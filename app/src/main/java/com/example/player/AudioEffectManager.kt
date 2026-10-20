@@ -5,6 +5,7 @@ import android.media.audiofx.BassBoost
 import android.media.audiofx.Equalizer
 import android.media.audiofx.Virtualizer
 import android.util.Log
+import com.example.util.FileLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,6 +57,7 @@ class AudioEffectManager(private val context: Context) {
     private var currentSessionId: Int = 0
 
     fun attachToAudioSession(audioSessionId: Int) {
+        FileLogger.info("AudioEffectManager", "attachToAudioSession id=$audioSessionId current=$currentSessionId")
         if (audioSessionId <= 0 || audioSessionId == currentSessionId) return
         currentSessionId = audioSessionId
 
@@ -117,6 +119,7 @@ class AudioEffectManager(private val context: Context) {
             }
 
         } catch (e: Exception) {
+            FileLogger.error("AudioEffectManager", "Equalizer attach failed", e)
             Log.w("AudioEffectManager", "Equalizer hardware attach fallback: ${e.message}")
             // Provide simulated bands for UI controls even if hardware audiofx is in emulator sandbox
             setupSimulatedBands()

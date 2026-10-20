@@ -11,6 +11,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.example.data.model.SessionEvaluation
 import com.example.data.model.Song
+import com.example.util.FileLogger
 import com.example.data.preferences.PlaybackPreferences
 import com.example.data.repository.SongRepository
 import com.example.engine.PlaybackMode
@@ -161,6 +162,7 @@ class SmartAudioPlayer(
     private fun setupPlayerListeners() {
         exoPlayer.addListener(object : Player.Listener {
             override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                FileLogger.info(TAG, "onAudioSessionIdChanged id=$audioSessionId")
                 if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
                     android.util.Log.d(TAG, "AudioSessionId changed: $audioSessionId — attaching EQ")
                     audioEffectManager.attachToAudioSession(audioSessionId)
@@ -175,6 +177,7 @@ class SmartAudioPlayer(
             }
 
             override fun onPlaybackStateChanged(state: Int) {
+                FileLogger.info(TAG, "onPlaybackStateChanged state=$state")
                 if (state == Player.STATE_READY) {
                     _durationMs.value = exoPlayer.duration.coerceAtLeast(0L)
                     // Audio session becomes valid only when player reaches READY.
@@ -246,6 +249,7 @@ class SmartAudioPlayer(
     }
 
     fun playSong(song: Song, startAtMs: Long = -1L) {
+        FileLogger.info(TAG, "playSong('${song.title}' uri='${song.uri.take(60)}')")
         val prevSong = _currentSong.value
         if (prevSong != null && prevSong.id != song.id) {
             saveCurrentPosition()

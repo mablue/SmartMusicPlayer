@@ -1,6 +1,7 @@
 package com.example.player
 
 import android.content.Intent
+import com.example.util.FileLogger
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -17,6 +18,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        FileLogger.info("PlaybackService", "onCreate")
         val instance = SmartAudioPlayer.instance
         if (instance != null) {
             mediaSession = MediaSession.Builder(this, instance.exoPlayer).build()
@@ -31,6 +33,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        FileLogger.info("PlaybackService", "onStartCommand action=${intent?.action}")
         // If SmartAudioPlayer initialized after the service, rebind the session
         // to the real ExoPlayer so Bluetooth commands affect the actual playback.
         val instance = SmartAudioPlayer.instance
