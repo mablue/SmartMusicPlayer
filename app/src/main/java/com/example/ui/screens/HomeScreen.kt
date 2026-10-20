@@ -201,6 +201,11 @@ fun HomeScreen(
     }
 
     // Back handler to collapse full player if open
+    // Back handler: exit selection mode first (do NOT close app)
+    BackHandler(enabled = uiState.isSelectionMode) {
+        viewModel.toggleSelectionMode(false)
+    }
+
     // Predictive Back for Full Player (developer.android.com/guide/navigation/custom-back/predictive-back-gesture)
     PredictiveBackHandler(enabled = uiState.showFullPlayer) { progress ->
         try {

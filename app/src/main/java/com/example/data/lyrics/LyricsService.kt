@@ -335,11 +335,7 @@ object LyricsService {
             val hasPersianChars = Regex("[\u0600-\u06FF]").containsMatchIn(text)
             // If the song line is already in Persian script:
             // Do NOT translate Persian into Persian! Translate to English instead if requested, or skip.
-            val effectiveTarget = if (hasPersianChars) {
-                if (targetLang == "fa") return@withContext null else targetLang
-            } else {
-                targetLang
-            }
+            val effectiveTarget = if (hasPersianChars && targetLang == "fa") "en" else targetLang
 
             val encoded = URLEncoder.encode(text.take(2000), "UTF-8")
             val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$effectiveTarget&dt=t&q=$encoded"
