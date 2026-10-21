@@ -145,9 +145,21 @@ class AudioEffectManager(private val context: Context) {
         _isEnabled.value = enabled
         try {
             equalizer?.enabled = enabled
-            bassBoost?.enabled = enabled
-            virtualizer?.enabled = enabled
-        } catch (e: Exception) {}
+            bassBoost?.let { bb ->
+                bb.enabled = enabled
+                if (enabled && bb.strengthSupported) {
+                    bb.setStrength(_bassBoostStrength.value.toShort())
+                }
+            }
+            virtualizer?.let { virt ->
+                virt.enabled = enabled
+                if (enabled && virt.strengthSupported) {
+                    virt.setStrength(_virtualizerStrength.value.toShort())
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("AudioEffectManager", "setEnabled error: ${e.message}")
+        }
     }
 
     fun setBandLevel(bandIndex: Short, levelMb: Short) {
@@ -165,9 +177,14 @@ class AudioEffectManager(private val context: Context) {
         _bassBoostStrength.value = safe
         try {
             bassBoost?.let {
-                if (it.strengthSupported) it.setStrength(safe.toShort())
+                if (it.strengthSupported) {
+                    it.setStrength(safe.toShort())
+                    if (safe > 0 && !it.enabled && _isEnabled.value) it.enabled = true
+                }
             }
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+            Log.w("AudioEffectManager", "setBassBoost error: ${e.message}")
+        }
     }
 
     fun setVirtualizer(strength: Int) {
@@ -175,9 +192,14 @@ class AudioEffectManager(private val context: Context) {
         _virtualizerStrength.value = safe
         try {
             virtualizer?.let {
-                if (it.strengthSupported) it.setStrength(safe.toShort())
+                if (it.strengthSupported) {
+                    it.setStrength(safe.toShort())
+                    if (safe > 0 && !it.enabled && _isEnabled.value) it.enabled = true
+                }
             }
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+            Log.w("AudioEffectManager", "setVirtualizer error: ${e.message}")
+        }
     }
 
     fun applyPreset(preset: EqPreset) {

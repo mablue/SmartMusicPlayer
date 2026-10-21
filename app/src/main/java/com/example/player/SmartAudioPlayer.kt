@@ -18,6 +18,7 @@ import com.example.engine.PlaybackMode
 import com.example.engine.SmartRankingEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -60,6 +61,22 @@ class SmartAudioPlayer(
     }
 
     private val prefs = PlaybackPreferences.getInstance(context)
+
+    private var attachJob: Job? = null
+    private fun scheduleAudioEffectAttach() {
+        attachJob?.cancel()
+        attachJob = coroutineScope.launch {
+            delay(1200L)
+            if (!exoPlayer.isPlaying) return@launch
+            runCatching {
+                val sid = exoPlayer.audioSessionId
+                if (sid != C.AUDIO_SESSION_ID_UNSET && sid > 0) {
+                    audioEffectManager.attachToAudioSession(sid)
+                    Log.d(TAG, "Effects attached after STATE_READY+1.2s: session=$sid")
+                }
+            }
+        }
+    }
 
     // ---------- StateFlows (همان‌طور که در نسخه قبلی بود) ----------
     private val _isPlaying = MutableStateFlow(false)
@@ -176,10 +193,8 @@ class SmartAudioPlayer(
         exoPlayer.addListener(object : Player.Listener {
             override fun onAudioSessionIdChanged(audioSessionId: Int) {
                 FileLogger.info(TAG, "onAudioSessionIdChanged id=$audioSessionId")
-                if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
-                    android.util.Log.d(TAG, "AudioSessionId changed: $audioSessionId — attaching EQ")
-                    audioEffectManager.attachToAudioSession(audioSessionId)
-                }
+                // DO NOT attach here — mutating pipeline during session creation
+                // mutes the FIRST play on many devices. Deferred below.
             }
 
 
@@ -193,15 +208,7 @@ class SmartAudioPlayer(
                 FileLogger.info(TAG, "onPlaybackStateChanged state=$state")
                 if (state == Player.STATE_READY) {
                     _durationMs.value = exoPlayer.duration.coerceAtLeast(0L)
-                    // Audio session becomes valid only when player reaches READY.
-                    // Re-attach EQ now so it actually affects the audio output.
-                    runCatching {
-                        val sid = exoPlayer.audioSessionId
-                        if (sid != C.AUDIO_SESSION_ID_UNSET && sid > 0) {
-                            audioEffectManager.attachToAudioSession(sid)
-                            Log.d(TAG, "EQ attached on STATE_READY: session=$sid")
-                        }
-                    }
+                    scheduleAudioEffectAttach()
                 }
                 if (state == Player.STATE_ENDED) {
                     handleTrackCompletion()

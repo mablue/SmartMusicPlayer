@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -87,9 +88,9 @@ fun LyricsPanel(
     onRetryFetch: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    // 手动滚动 → 暂停自动滚动 5 秒
     var userScrollCooldown by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
+    val isDragging by listState.interactionSource.collectIsDraggedAsState()
 
     val lines = lyricsResult?.lines ?: emptyList()
     val activeIndex = remember(currentPositionMs, lines) {
@@ -97,24 +98,23 @@ fun LyricsPanel(
         if (idx >= 0) idx else 0
     }
 
-    // 自动滚动（尊重手动滚动冷却期）
-    LaunchedEffect(activeIndex, userScrollCooldown) {
-        if (userScrollCooldown <= 0 && lyricsResult?.isSynced == true && activeIndex in lines.indices) {
+    LaunchedEffect(isDragging) {
+        if (isDragging) userScrollCooldown = 5
+    }
+
+    LaunchedEffect(activeIndex, userScrollCooldown, isDragging) {
+        if (!isDragging && userScrollCooldown <= 0 &&
+            lyricsResult?.isSynced == true && activeIndex in lines.indices
+        ) {
             listState.animateScrollToItem(activeIndex)
         }
     }
 
-    // 冷却倒计时
     LaunchedEffect(userScrollCooldown) {
         if (userScrollCooldown > 0) {
             delay(1000L)
             userScrollCooldown -= 1
         }
-    }
-
-    // 监听手动滚动
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) userScrollCooldown = 5
     }
 
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
@@ -238,7 +238,7 @@ fun LyricsPanel(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
                             horizontal = 28.dp,
-                            vertical = screenHeight * 0.25f
+                            vertical = screenHeight * 0.4f
                         ),
                         verticalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
