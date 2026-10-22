@@ -138,7 +138,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
 
         when (state.sortOrder) {
-            com.example.data.model.SongSortOrder.DEFAULT -> list // already sorted by smart affinity / score
+            com.example.data.model.SongSortOrder.DEFAULT -> list.sortedByDescending { it.score } // Smart Rank DESC
             com.example.data.model.SongSortOrder.DURATION_DESC -> list.sortedByDescending { it.durationMs }
             com.example.data.model.SongSortOrder.DURATION_ASC -> list.sortedBy { it.durationMs }
             com.example.data.model.SongSortOrder.SIZE_DESC -> list.sortedByDescending { it.fileSizeBytes }

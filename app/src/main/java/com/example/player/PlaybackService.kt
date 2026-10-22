@@ -1,5 +1,6 @@
 package com.example.player
 
+import android.app.PendingIntent
 import android.content.Intent
 import android.view.KeyEvent
 import androidx.media3.common.Player
@@ -39,6 +40,7 @@ class PlaybackService : MediaSessionService() {
         }
 
         mediaSession = MediaSession.Builder(this, player)
+            .setSessionActivity(buildSessionActivity())
             .setCallback(MediaCallback())
             .build()
     }
@@ -53,6 +55,7 @@ class PlaybackService : MediaSessionService() {
             standbyPlayer?.release()
             standbyPlayer = null
             mediaSession = MediaSession.Builder(this, instance.exoPlayer)
+                .setSessionActivity(buildSessionActivity())
                 .setCallback(MediaCallback())
                 .build()
         }
@@ -79,6 +82,16 @@ class PlaybackService : MediaSessionService() {
         mediaSession = null
         standbyPlayer = null
         super.onDestroy()
+    }
+
+    private fun buildSessionActivity(): PendingIntent {
+        val intent = Intent(this, com.example.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        return PendingIntent.getActivity(
+            this, 0, intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
     }
 
     private inner class MediaCallback : MediaSession.Callback {
