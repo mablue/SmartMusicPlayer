@@ -260,6 +260,36 @@ class SmartAudioPlayer(
         _currentSong.value = song.copy(resumePositionMs = resumePos)
         _currentPositionMs.value = resumePos
         _durationMs.value = song.durationMs
+
+        // CRITICAL FIX: load the media item into ExoPlayer WITHOUT auto-play.
+        // Previously, the first user togglePlayPause() called exoPlayer.play()
+        // on an EMPTY player (mediaItemCount == 0). That flipped _isPlaying=true
+        // but produced no audio and no position advance — user had to skip to
+        // another track to "wake up" the player. Now the media item is ready
+        // in paused state, so the very first play() actually starts audio.
+        val playableUri = song.uri.ifEmpty {
+            runCatching { getFallbackUri(song) }.getOrDefault("")
+        }
+        if (playableUri.isNotEmpty()) {
+            runCatching {
+                val mediaItem = MediaItem.Builder()
+                    .setMediaId(song.id.toString())
+                    .setUri(playableUri)
+                    .setMediaMetadata(
+                        androidx.media3.common.MediaMetadata.Builder()
+                            .setTitle(song.title)
+                            .setArtist(song.artist)
+                            .build()
+                    )
+                    .build()
+                exoPlayer.setMediaItem(mediaItem)
+                exoPlayer.prepare()
+                exoPlayer.seekTo(resumePos)
+                prefs.lastSongId = song.id
+                prefs.lastPositionMs = resumePos
+            }
+        }
+
         fetchLyricsForSong(song)
     }
 
@@ -317,12 +347,10 @@ class SmartAudioPlayer(
 
         try { context.startService(Intent(context, PlaybackService::class.java)) } catch (_: Exception) {}
 
-        runCatching {
-            val sid = exoPlayer.audioSessionId
-            if (sid != C.AUDIO_SESSION_ID_UNSET && sid > 0) {
-                audioEffectManager.attachToAudioSession(sid)
-            }
-        }
+        // NOTE: effects attach ONLY from scheduleAudioEffectAttach() (STATE_READY
+        // + 1.2s), never directly here. Calling attachToAudioSession during
+        // pipeline init was muting the first play AND preventing the deferred
+        // attach from ever firing (early-return on same session id).
 
         _isPlaying.value = true
     }
