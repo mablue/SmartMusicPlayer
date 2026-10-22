@@ -66,8 +66,6 @@ fun EqualizerDialog(
     val isEnabled by audioEffectManager.isEnabled.collectAsState()
     val currentPreset by audioEffectManager.currentPreset.collectAsState()
     val bands by audioEffectManager.bands.collectAsState()
-    val bassBoost by audioEffectManager.bassBoostStrength.collectAsState()
-    val virtualizer by audioEffectManager.virtualizerStrength.collectAsState()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -221,83 +219,7 @@ fun EqualizerDialog(
                     }
                 }
 
-                // Deep Bass Boost Slider
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                    border = BorderStroke(1.dp, DarkSurfaceBorder)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.GraphicEq, contentDescription = null, tint = NeonViolet, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("تقویت بیس عمیق (Bass Boost)", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
-                            }
-                            Text("${bassBoost / 10}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = NeonViolet)
-                        }
 
-                        Slider(
-                            value = bassBoost.toFloat(),
-                            onValueChange = { audioEffectManager.setBassBoost(it.toInt()) },
-                            valueRange = 0f..1000f,
-                            enabled = isEnabled,
-                            colors = SliderDefaults.colors(
-                                thumbColor = NeonViolet,
-                                activeTrackColor = NeonViolet,
-                                inactiveTrackColor = Color(0xFF334155)
-                            ),
-                            modifier = Modifier.height(28.dp)
-                        )
-                    }
-                }
-
-                // 3D Virtualizer / Surround Sound Slider
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                    border = BorderStroke(1.dp, DarkSurfaceBorder)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.SurroundSound, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("صدای فراگیر سه‌بعدی (3D Virtualizer)", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
-                            }
-                            Text("${virtualizer / 10}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = NeonEmerald)
-                        }
-
-                        Slider(
-                            value = virtualizer.toFloat(),
-                            onValueChange = { audioEffectManager.setVirtualizer(it.toInt()) },
-                            valueRange = 0f..1000f,
-                            enabled = isEnabled,
-                            colors = SliderDefaults.colors(
-                                thumbColor = NeonEmerald,
-                                activeTrackColor = NeonEmerald,
-                                inactiveTrackColor = Color(0xFF334155)
-                            ),
-                            modifier = Modifier.height(28.dp)
-                        )
-                    }
-                }
             }
         },
         confirmButton = {

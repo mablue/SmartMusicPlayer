@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,9 +78,9 @@ fun PlaylistsTabContent(
                     }
                 }
                 Column {
-                    Text("پلی‌لیست‌های من",
+                    Text(stringResource(com.example.R.string.playlists_title),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
-                    Text("${userPlaylists.size + 1} پلی‌لیست",
+                    Text(stringResource(com.example.R.string.playlists_count, userPlaylists.size + 1),
                         style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF94A3B8), fontSize = 11.sp))
                 }
             }
@@ -113,9 +114,9 @@ fun PlaylistsTabContent(
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("برگزیده‌ها",
+                            Text(stringResource(com.example.R.string.playlists_favorites_title),
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = Color.White))
-                            Text("${favoriteSongs.size} آهنگ مورد علاقه",
+                            Text(stringResource(com.example.R.string.playlists_favorites_count, favoriteSongs.size),
                                 style = MaterialTheme.typography.bodySmall.copy(color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp))
                         }
                         Surface(shape = CircleShape, color = NeonAmber, modifier = Modifier.size(38.dp)) {
@@ -135,14 +136,14 @@ fun PlaylistsTabContent(
             ) {
                 Icon(Icons.Default.Add, null, tint = NeonCyan, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("ساخت پلی‌لیست جدید", color = NeonCyan, fontWeight = FontWeight.Bold)
+                Text(stringResource(com.example.R.string.playlists_create_new), color = NeonCyan, fontWeight = FontWeight.Bold)
             }
         }
 
         if (userPlaylists.isEmpty()) {
             item {
                 Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
-                    Text("هنوز پلی‌لیستی نساخته‌اید.\nاز منوی هر آهنگ «افزودن به پلی‌لیست» را بزنید.",
+                    Text(stringResource(com.example.R.string.playlists_empty_hint),
                         color = Color(0xFF64748B), fontSize = 12.sp, lineHeight = 18.sp)
                 }
             }
@@ -167,7 +168,7 @@ fun PlaylistsTabContent(
                             Text(pl.name,
                                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = Color.White),
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${pl.getSongIds().size} آهنگ",
+                            Text(stringResource(com.example.R.string.playlists_song_count, pl.getSongIds().size),
                                 style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF94A3B8), fontSize = 11.sp))
                         }
                         IconButton(onClick = { onDeletePlaylist(pl.id) }) {

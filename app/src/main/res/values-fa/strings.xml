@@ -182,4 +182,11 @@
     <string name="btn_sort">مرتب‌سازی</string>
     <string name="podcasts_empty_title">هنوز پادکستی نیست</string>
     <string name="podcasts_empty_desc">فایل‌های صوتی بلند و قسمت‌های پادکست اینجا ظاهر می‌شوند</string>
+    <string name="playlists_title">پلی‌لیست‌های من</string>
+    <string name="playlists_count">%d پلی‌لیست</string>
+    <string name="playlists_favorites_title">برگزیده‌ها</string>
+    <string name="playlists_favorites_count">%d آهنگ مورد علاقه</string>
+    <string name="playlists_create_new">ساخت پلی‌لیست جدید</string>
+    <string name="playlists_empty_hint">هنوز پلی‌لیستی نساخته‌اید.\nاز منوی هر آهنگ «افزودن به پلی‌لیست» را بزنید.</string>
+    <string name="playlists_song_count">%d آهنگ</string>
 </resources>
