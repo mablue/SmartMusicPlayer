@@ -9,11 +9,16 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Verbose file logger. All info/warn/error calls are written — no dedupe,
+ * no mute. Inspect /sdcard/Android/data/<pkg>/files/smartmusic_logs/errors.log
+ * to diagnose playback and notification issues.
+ */
 object FileLogger {
     private const val TAG = "FileLogger"
     private const val LOG_DIR = "smartmusic_logs"
     private const val LOG_FILE = "errors.log"
-    private const val MAX_BYTES = 2 * 1024 * 1024L
+    private const val MAX_BYTES = 5 * 1024 * 1024L
 
     @Volatile private var file: File? = null
     private val df = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
@@ -50,16 +55,21 @@ object FileLogger {
         Log.d(TAG, "FileLogger initialized: ${f.absolutePath}")
     }
 
-    fun info(tag: String, msg: String) = appendLine("[$tag] ${now()} $msg")
+    fun info(tag: String, msg: String) {
+        appendLine("[$tag] ${now()} $msg")
+        Log.d(tag, msg)
+    }
 
     fun warn(tag: String, msg: String, e: Throwable? = null) {
         val stack = e?.let { "\n" + toStack(it) } ?: ""
         appendLine("[$tag][WARN] ${now()} $msg$stack")
+        Log.w(tag, msg, e)
     }
 
     fun error(tag: String, msg: String, e: Throwable? = null) {
         val stack = e?.let { "\n" + toStack(it) } ?: ""
         appendLine("[$tag][ERROR] ${now()} $msg$stack")
+        Log.e(tag, msg, e)
     }
 
     fun getLogFile(): File? = file

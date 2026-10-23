@@ -345,7 +345,17 @@ class SmartAudioPlayer(
         exoPlayer.seekTo(targetStart)
         exoPlayer.play()
 
-        try { context.startService(Intent(context, PlaybackService::class.java)) } catch (_: Exception) {}
+        try {
+            val svcIntent = Intent(context, PlaybackService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(svcIntent)
+                FileLogger.info(TAG, "playSong: startForegroundService OK")
+            } else {
+                context.startService(svcIntent)
+            }
+        } catch (e: Exception) {
+            FileLogger.error(TAG, "playSong: startForegroundService FAILED", e)
+        }
 
         // NOTE: effects attach ONLY from scheduleAudioEffectAttach() (STATE_READY
         // + 1.2s), never directly here. Calling attachToAudioSession during
@@ -677,16 +687,24 @@ class SmartAudioPlayer(
     }
 
     fun onSongDeleted(deletedId: Long) {
+        val wasCurrent = _currentSong.value?.id == deletedId
+        val originalIdx = currentPlaylist.indexOfFirst { it.id == deletedId }
+        FileLogger.info(TAG, "onSongDeleted id=$deletedId wasCurrent=$wasCurrent idx=$originalIdx")
         _queue.value = _queue.value.filter { it.id != deletedId }
         currentPlaylist = currentPlaylist.filter { it.id != deletedId }
-        if (_currentSong.value?.id == deletedId) {
-            val wasPlaying = _isPlaying.value
+
+        if (wasCurrent) {
+            val next = when {
+                originalIdx in currentPlaylist.indices -> currentPlaylist[originalIdx]
+                currentPlaylist.isNotEmpty() -> currentPlaylist.first()
+                else -> null
+            }
+            FileLogger.info(TAG, "onSongDeleted next=${next?.title}")
             exoPlayer.stop()
             _isPlaying.value = false
             _currentPositionMs.value = 0
-            val next = currentPlaylist.firstOrNull { it.id != deletedId }
             _currentSong.value = next
-            if (next != null && wasPlaying) playSong(next)
+            if (next != null) playSong(next)
         }
     }
 
