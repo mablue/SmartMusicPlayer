@@ -262,30 +262,30 @@ class SmartAudioPlayer(
         _currentPositionMs.value = resumePos
         _durationMs.value = song.durationMs
 
-        // CRITICAL FIX: load the media item into ExoPlayer WITHOUT auto-play.
-        // Previously, the first user togglePlayPause() called exoPlayer.play()
-        // on an EMPTY player (mediaItemCount == 0). That flipped _isPlaying=true
-        // but produced no audio and no position advance — user had to skip to
-        // another track to "wake up" the player. Now the media item is ready
-        // in paused state, so the very first play() actually starts audio.
-        val playableUri = song.uri.ifEmpty {
-            runCatching { getFallbackUri(song) }.getOrDefault("")
-        }
-        if (playableUri.isNotEmpty()) {
+        // STANDARD: preload the FULL queue (not single-item), so the notification
+        // gets Next/Prev from the very first play. Using setMediaItems with the
+        // whole playlist keeps player.timeline in sync with currentPlaylist.
+        if (playlist.isNotEmpty()) {
             runCatching {
-                val mediaItem = MediaItem.Builder()
-                    .setMediaId(song.id.toString())
-                    .setUri(playableUri)
-                    .setMediaMetadata(
-                        androidx.media3.common.MediaMetadata.Builder()
-                            .setTitle(song.title)
-                            .setArtist(song.artist)
-                            .build()
-                    )
-                    .build()
-                exoPlayer.setMediaItem(mediaItem)
+                val mediaItems = playlist.map { s ->
+                    val uri = if (s.uri.isNotEmpty()) s.uri
+                              else if (s.id == song.id) runCatching { getFallbackUri(s) }.getOrDefault("")
+                              else "content://placeholder/${s.id}"
+                    MediaItem.Builder()
+                        .setMediaId(s.id.toString())
+                        .setUri(uri)
+                        .setMediaMetadata(
+                            androidx.media3.common.MediaMetadata.Builder()
+                                .setTitle(s.title)
+                                .setArtist(s.artist)
+                                .build()
+                        )
+                        .build()
+                }
+                val startIdx = playlist.indexOfFirst { it.id == song.id }
+                    .takeIf { it >= 0 } ?: 0
+                exoPlayer.setMediaItems(mediaItems, startIdx, resumePos)
                 exoPlayer.prepare()
-                exoPlayer.seekTo(resumePos)
                 prefs.lastSongId = song.id
                 prefs.lastPositionMs = resumePos
             }
@@ -388,6 +388,16 @@ class SmartAudioPlayer(
     }
 
     fun togglePlayPause() {
+        // SAFETY: if the player still has only 1 item while the app playlist
+        // has more (cold start race), rebuild the queue before toggling.
+        if (exoPlayer.mediaItemCount <= 1 && currentPlaylist.size > 1) {
+            val cur = _currentSong.value
+            if (cur != null) {
+                FileLogger.info(TAG, "togglePlayPause: queue stale (1 item, playlist ${currentPlaylist.size}) → rebuild")
+                playSong(cur)
+                return
+            }
+        }
         if (exoPlayer.isPlaying) pause() else resume()
     }
 
