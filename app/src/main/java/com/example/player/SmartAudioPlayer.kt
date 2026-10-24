@@ -29,6 +29,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import com.example.data.lyrics.LyricLine
 import com.example.data.lyrics.LyricsResult
+import com.example.data.lyrics.LyricsQueryBuilder
 import com.example.data.lyrics.LyricsService
 
 class SmartAudioPlayer(
@@ -543,6 +544,10 @@ class SmartAudioPlayer(
         val gen = ++lyricsGeneration
         lyricsJob?.cancel()
         lyricsJob = coroutineScope.launch(Dispatchers.IO) {
+            if (LyricsQueryBuilder.shouldSkip(song)) {
+                FileLogger.info(TAG, "Skip lyrics: genre=${song.genre} dur=${song.durationMs}ms '${song.title}'")
+                return@launch
+            }
             if (!force && !prefs.isLyricsAutoSearchEnabled) {
                 val cached = repository.getCachedLyrics(song.id)
                 if (cached == null) {

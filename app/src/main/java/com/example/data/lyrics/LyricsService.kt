@@ -1,7 +1,9 @@
 package com.example.data.lyrics
 
 import android.util.Log
+import com.example.util.FileLogger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -36,148 +38,183 @@ object LyricsService {
     private val LRC_PATTERN = Pattern.compile("""\[(\d{2}):(\d{2})\.(\d{2,3})](.*)""")
 
     /**
-     * Fetches real synced/plain lyrics from open public lyrics registry (LRCLIB).
-     * No proprietary keys required.
+     * Multi-strategy lyrics fetch. Tries up to ~8 progressively-simpler
+     * queries against LRCLIB before falling back to lyrics.ovh and Lyrica.
+     * First successful provider returns immediately.
      */
-    suspend fun fetchLyrics(artist: String, title: String, durationSec: Long = 0L): LyricsResult? = withContext(Dispatchers.IO) {
+    suspend fun fetchLyrics(
+        artist: String,
+        title: String,
+        durationSec: Long = 0L
+    ): LyricsResult? = withContext(Dispatchers.IO) {
         try {
-            val cleanTitle = cleanSearchQuery(title)
-            val cleanArtist = cleanSearchQuery(artist)
-
-            // Step 1: Direct exact match
-            val directUrl = StringBuilder("https://lrclib.net/api/get?")
-                .append("artist_name=").append(URLEncoder.encode(cleanArtist, "UTF-8"))
-                .append("&track_name=").append(URLEncoder.encode(cleanTitle, "UTF-8"))
-            if (durationSec > 0) {
-                directUrl.append("&duration=").append(durationSec)
+            val strategies = LyricsQueryBuilder.generateStrategies(artist, title)
+            if (strategies.isEmpty()) {
+                FileLogger.info(TAG, "No strategies for '$artist' - '$title' (probably cleaned to empty)")
+                return@withContext null
             }
 
-            val directRequest = Request.Builder()
-                .url(directUrl.toString())
-                .header("User-Agent", "SmartMusic-Android/2.0")
-                .build()
+            FileLogger.info(TAG, "fetchLyrics: $artist - $title → ${strategies.size} strategies")
 
-            client.newCall(directRequest).execute().use { response ->
-                if (response.isSuccessful) {
-                    val body = response.body?.string()
-                    if (!body.isNullOrEmpty()) {
-                        val json = JSONObject(body)
-                        val syncedLyrics = json.optString("syncedLyrics")
-                        val plainLyrics = json.optString("plainLyrics")
+            for ((idx, q) in strategies.withIndex()) {
+                if (!isActive) {
+                    FileLogger.info(TAG, "Cancelled at idx=$idx")
+                    return@withContext null
+                }
 
-                        if (syncedLyrics.isNotEmpty()) {
-                            val parsed = parseLrc(syncedLyrics)
-                            if (parsed.isNotEmpty()) {
-                                return@withContext LyricsResult(
-                                    lines = parsed,
-                                    isSynced = true,
-                                    source = "LRCLIB Synced",
-                                    plainText = plainLyrics.ifEmpty { syncedLyrics }
-                                )
-                            }
-                        }
-
-                        if (plainLyrics.isNotEmpty()) {
-                            val lines = plainLyrics.lines().filter { it.isNotBlank() }.mapIndexed { idx, line ->
-                                LyricLine(timestampMs = idx * 4000L, text = line.trim())
-                            }
-                            return@withContext LyricsResult(
-                                lines = lines,
-                                isSynced = false,
-                                source = "LRCLIB Plain",
-                                plainText = plainLyrics
-                            )
-                        }
+                if (q.artist.isNotBlank()) {
+                    val fromGet = tryLrclibGet(q.artist, q.title, durationSec)
+                    if (fromGet != null) {
+                        FileLogger.info(TAG, "WON ${q.stage}(get) idx=$idx: '${q.artist}' - '${q.title}'")
+                        return@withContext fromGet
                     }
+                }
+
+                val fromSearch = tryLrclibSearch(q.artist, q.title)
+                if (fromSearch != null) {
+                    FileLogger.info(TAG, "WON ${q.stage}(search) idx=$idx: '${q.artist}' - '${q.title}'")
+                    return@withContext fromSearch
+                }
+
+                FileLogger.info(TAG, "✗ ${q.stage} idx=$idx: '${q.artist}' - '${q.title}'")
+            }
+
+            val s1 = strategies.firstOrNull()
+
+            if (s1 != null && s1.artist.isNotBlank()) {
+                val ovh = tryLyricsOvh(s1.artist, s1.title, durationSec)
+                if (ovh != null) {
+                    FileLogger.info(TAG, "WON ovh: '${s1.artist}' - '${s1.title}'")
+                    return@withContext ovh
                 }
             }
 
-            // Step 2: Fallback query search
-            val searchUrl = "https://lrclib.net/api/search?q=" + URLEncoder.encode("$cleanArtist $cleanTitle", "UTF-8")
-            val searchRequest = Request.Builder()
-                .url(searchUrl)
-                .header("User-Agent", "SmartMusic-Android/2.0")
-                .build()
-
-            client.newCall(searchRequest).execute().use { response ->
-                if (response.isSuccessful) {
-                    val body = response.body?.string()
-                    if (!body.isNullOrEmpty()) {
-                        val jsonArray = JSONArray(body)
-                        if (jsonArray.length() > 0) {
-                            val first = jsonArray.getJSONObject(0)
-                            val syncedLyrics = first.optString("syncedLyrics")
-                            val plainLyrics = first.optString("plainLyrics")
-
-                            if (syncedLyrics.isNotEmpty()) {
-                                val parsed = parseLrc(syncedLyrics)
-                                if (parsed.isNotEmpty()) {
-                                    return@withContext LyricsResult(
-                                        lines = parsed,
-                                        isSynced = true,
-                                        source = "LRCLIB Synced",
-                                        plainText = plainLyrics.ifEmpty { syncedLyrics }
-                                    )
-                                }
-                            }
-
-                            if (plainLyrics.isNotEmpty()) {
-                                val lines = plainLyrics.lines().filter { it.isNotBlank() }.mapIndexed { idx, line ->
-                                    LyricLine(timestampMs = idx * 4000L, text = line.trim())
-                                }
-                                return@withContext LyricsResult(
-                                    lines = lines,
-                                    isSynced = false,
-                                    source = "LRCLIB Plain",
-                                    plainText = plainLyrics
-                                )
-                            }
-                        }
-                    }
+            if (s1 != null) {
+                val lyrica = fetchLyricsFromLyrica(s1.artist, s1.title)
+                if (lyrica != null) {
+                    FileLogger.info(TAG, "WON lyrica: '${s1.artist}' - '${s1.title}'")
+                    return@withContext lyrica
                 }
             }
 
-            // Step 3: Fallback - lyrics.ovh free public API
-            val ovhUrl = "https://api.lyrics.ovh/v1/" +
-                    URLEncoder.encode(cleanArtist, "UTF-8") + "/" +
-                    URLEncoder.encode(cleanTitle, "UTF-8")
-            try {
-                val ovhReq = Request.Builder().url(ovhUrl).header("User-Agent", "SmartMusic-Android/2.0").build()
-                client.newCall(ovhReq).execute().use { resp ->
-                    if (resp.isSuccessful) {
-                        val body = resp.body?.string()
-                        if (!body.isNullOrEmpty()) {
-                            val json = JSONObject(body)
-                            val lyricsStr = json.optString("lyrics")
-                            if (lyricsStr.isNotBlank()) {
-                                return@withContext fitPlainLyricsToSongDuration(lyricsStr, durationSec * 1000L, "Lyrics.ovh")
-                            }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.d(TAG, "Lyrics.ovh fallback bypassed: ${e.message}")
-            }
-
-            // Step 4: Fallback - Google / Web lyrics search
-            val lyricaResult = fetchLyricsFromLyrica(cleanArtist, cleanTitle)
-            if (lyricaResult != null) {
-                return@withContext lyricaResult
-            }
-
+            FileLogger.info(TAG, "ALL FAILED: '$artist' - '$title'")
+            null
         } catch (e: Exception) {
-            Log.w(TAG, "Lyrics fetch error for $artist - $title: ${e.message}")
+            FileLogger.error(TAG, "fetchLyrics error: ${e.message}", e)
+            null
         }
-        null
     }
 
-    /**
-     * Searches Google for lyrics when database APIs have no record (e.g. Persian / local indie tracks).
-     */
-    /**
-     * Lyrica API — open aggregator over LRCLIB / Genius / Musixmatch / YouTube Music / NetEase.
-     * The Turkish test returned synced LRC lyrics via this endpoint, which LRCLIB alone missed.
-     */
+    private suspend fun tryLrclibGet(
+        artist: String,
+        title: String,
+        durationSec: Long
+    ): LyricsResult? {
+        return try {
+            val url = StringBuilder("https://lrclib.net/api/get?")
+                .append("artist_name=").append(URLEncoder.encode(artist, "UTF-8"))
+                .append("&track_name=").append(URLEncoder.encode(title, "UTF-8"))
+            if (durationSec > 0) url.append("&duration=").append(durationSec)
+
+            val req = Request.Builder()
+                .url(url.toString())
+                .header("User-Agent", "SmartMusic-Android/2.0")
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val body = resp.body?.string() ?: return null
+                if (body.isBlank()) return null
+                val json = JSONObject(body)
+                parseLrclibResponse(json)
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private suspend fun tryLrclibSearch(artist: String, title: String): LyricsResult? {
+        return try {
+            val q = if (artist.isNotBlank()) "$artist $title" else title
+            val url = "https://lrclib.net/api/search?q=" + URLEncoder.encode(q, "UTF-8")
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", "SmartMusic-Android/2.0")
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val body = resp.body?.string() ?: return null
+                if (body.isBlank()) return null
+                val arr = JSONArray(body)
+                if (arr.length() == 0) return null
+                parseLrclibResponse(arr.getJSONObject(0))
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun parseLrclibResponse(json: JSONObject): LyricsResult? {
+        val synced = json.optString("syncedLyrics")
+        val plain = json.optString("plainLyrics")
+
+        if (synced.isNotEmpty()) {
+            val parsed = parseLrc(synced)
+            if (parsed.isNotEmpty()) {
+                return LyricsResult(
+                    lines = parsed,
+                    isSynced = true,
+                    source = "LRCLIB Synced",
+                    plainText = plain.ifEmpty { synced }
+                )
+            }
+        }
+        if (plain.isNotEmpty()) {
+            val lines = plain.lines().filter { it.isNotBlank() }.mapIndexed { i, l ->
+                LyricLine(timestampMs = i * 4000L, text = l.trim())
+            }
+            return LyricsResult(
+                lines = lines,
+                isSynced = false,
+                source = "LRCLIB Plain",
+                plainText = plain
+            )
+        }
+        return null
+    }
+
+    private suspend fun tryLyricsOvh(
+        artist: String,
+        title: String,
+        durationSec: Long
+    ): LyricsResult? {
+        return try {
+            val url = "https://api.lyrics.ovh/v1/" +
+                    URLEncoder.encode(artist, "UTF-8") + "/" +
+                    URLEncoder.encode(title, "UTF-8")
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", "SmartMusic-Android/2.0")
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val body = resp.body?.string() ?: return null
+                val json = JSONObject(body)
+                val lyricsStr = json.optString("lyrics")
+                if (lyricsStr.isNotBlank()) {
+                    return fitPlainLyricsToSongDuration(
+                        lyricsStr, durationSec * 1000L, "Lyrics.ovh"
+                    )
+                }
+            }
+            null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private suspend fun fetchLyricsFromLyrica(artist: String, title: String): LyricsResult? {
         return try {
             val url = "https://wilooper-lyrica.hf.space/lyrics/?artist=" +
@@ -185,35 +222,27 @@ object LyricsService {
                     "&song=" + URLEncoder.encode(title, "UTF-8") +
                     "&timestamps=true"
 
-            val request = Request.Builder()
+            val req = Request.Builder()
                 .url(url)
                 .header("User-Agent", "SmartMusic-Android/2.0")
                 .build()
 
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    Log.d(TAG, "Lyrica HTTP ${response.code}")
-                    return null
-                }
-                val body = response.body?.string() ?: return null
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val body = resp.body?.string() ?: return null
                 if (body.isBlank()) return null
 
                 val json = JSONObject(body)
-                if (json.optString("status") != "success") {
-                    Log.d(TAG, "Lyrica status != success")
-                    return null
-                }
+                if (json.optString("status") != "success") return null
 
                 val data = json.optJSONObject("data") ?: return null
                 val lyricsText = data.optString("lyrics", "")
                 if (lyricsText.isBlank()) return null
                 val sourceName = data.optString("source", "unknown")
 
-                // LRC-formatted response → parse as synced
                 if (Regex("""\[\d{2}:\d{2}\.\d{2,3}\]""").containsMatchIn(lyricsText)) {
                     val parsed = parseLrc(lyricsText)
                     if (parsed.isNotEmpty()) {
-                        Log.d(TAG, "Lyrica synced ($sourceName, ${parsed.size} lines)")
                         return LyricsResult(
                             lines = parsed,
                             isSynced = true,
@@ -223,13 +252,9 @@ object LyricsService {
                     }
                 }
 
-                // Plain response → auto-fit timing via existing helper later
-                Log.d(TAG, "Lyrica plain ($sourceName, ${lyricsText.length} chars)")
                 val lines = lyricsText.lines()
                     .filter { it.isNotBlank() }
-                    .mapIndexed { idx, line ->
-                        LyricLine(timestampMs = idx * 4000L, text = line.trim())
-                    }
+                    .mapIndexed { i, l -> LyricLine(timestampMs = i * 4000L, text = l.trim()) }
 
                 LyricsResult(
                     lines = lines,
@@ -239,58 +264,15 @@ object LyricsService {
                 )
             }
         } catch (e: Exception) {
-            Log.d(TAG, "Lyrica API error: ${e.message}")
             null
         }
     }
 
-    private fun searchGoogleForLyrics(artist: String, title: String): String? {
-        try {
-            val query = if (Regex("[\u0600-\u06FF]").containsMatchIn("$artist $title")) {
-                "متن آهنگ $artist $title"
-            } else {
-                "lyrics $artist $title"
-            }
-            val searchUrl = "https://html.duckduckgo.com/html/?q=" + URLEncoder.encode(query, "UTF-8")
-            val req = Request.Builder()
-                .url(searchUrl)
-                .header("User-Agent", "Mozilla/5.0 (Android; Mobile)")
-                .build()
-
-            client.newCall(req).execute().use { resp ->
-                if (resp.isSuccessful) {
-                    val html = resp.body?.string() ?: return null
-                    // Extract snippets from search results
-                    val snippetRegex = Regex("""<a class="result__snippet[^>]*>(.*?)</a>""", RegexOption.DOT_MATCHES_ALL)
-                    val matches = snippetRegex.findAll(html).take(4)
-                    val collected = StringBuilder()
-                    for (m in matches) {
-                        val clean = m.groupValues[1]
-                            .replace(Regex("<[^>]*>"), "")
-                            .replace("&quot;", "\"")
-                            .replace("&amp;", "&")
-                            .trim()
-                        if (clean.length > 30) {
-                            collected.append(clean).append("\n")
-                        }
-                    }
-                    if (collected.length > 50) {
-                        return collected.toString()
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.d(TAG, "Web search fallback error: ${e.message}")
-        }
-        return null
-    }
-
-    /**
-     * Smart Auto-Fit equation:
-     * Fits plain static lyrics dynamically across track duration based on line length and pauses,
-     * transforming static plain lyrics into synced scrolling HUD!
-     */
-    fun fitPlainLyricsToSongDuration(plainText: String, totalDurationMs: Long, sourceName: String): LyricsResult {
+    fun fitPlainLyricsToSongDuration(
+        plainText: String,
+        totalDurationMs: Long,
+        sourceName: String
+    ): LyricsResult {
         val validLines = plainText.lines()
             .map { it.trim() }
             .filter { it.isNotBlank() && !it.startsWith("Paroles de") && !it.startsWith("Lyrics by") }
@@ -304,102 +286,75 @@ object LyricsService {
         val outroPauseMs = (trackDuration * 0.05f).toLong().coerceIn(4000L, 12000L)
         val effectiveMs = (trackDuration - introPauseMs - outroPauseMs).coerceAtLeast(10_000L)
 
-        // Line weights based on length (syllables approximation)
         val weights = validLines.map { line -> line.length.coerceIn(15, 80).toFloat() }
         val totalWeight = weights.sum().coerceAtLeast(1.0f)
 
-        var accumulatedMs = introPauseMs
-        val fittedLines = mutableListOf<LyricLine>()
-
+        var acc = introPauseMs
+        val fitted = mutableListOf<LyricLine>()
         for (i in validLines.indices) {
-            val lineDuration = ((weights[i] / totalWeight) * effectiveMs).toLong().coerceAtLeast(2500L)
-            fittedLines.add(LyricLine(timestampMs = accumulatedMs, text = validLines[i]))
-            accumulatedMs += lineDuration
+            val lineDur = ((weights[i] / totalWeight) * effectiveMs).toLong().coerceAtLeast(2500L)
+            fitted.add(LyricLine(timestampMs = acc, text = validLines[i]))
+            acc += lineDur
         }
 
         return LyricsResult(
-            lines = fittedLines,
+            lines = fitted,
             isSynced = true,
             source = "$sourceName (Auto-Fitted)",
             plainText = plainText
         )
     }
 
-    /**
-     * Translates lyrics text using public translation endpoint.
-     * Prevents translating Persian into Persian, and auto-switches target if already matching.
-     */
-    suspend fun translateText(text: String, targetLang: String = "fa"): String? = withContext(Dispatchers.IO) {
-        if (text.isBlank()) return@withContext null
-        try {
-            val hasPersianChars = Regex("[\u0600-\u06FF]").containsMatchIn(text)
-            // If the song line is already in Persian script:
-            // Do NOT translate Persian into Persian! Translate to English instead if requested, or skip.
-            val effectiveTarget = if (hasPersianChars && targetLang == "fa") "en" else targetLang
+    suspend fun translateText(text: String, targetLang: String = "fa"): String? =
+        withContext(Dispatchers.IO) {
+            if (text.isBlank()) return@withContext null
+            try {
+                val hasPersian = Regex("[\u0600-\u06FF]").containsMatchIn(text)
+                val effectiveTarget = if (hasPersian && targetLang == "fa") "en" else targetLang
 
-            val encoded = URLEncoder.encode(text.take(2000), "UTF-8")
-            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$effectiveTarget&dt=t&q=$encoded"
+                val encoded = URLEncoder.encode(text.take(2000), "UTF-8")
+                val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$effectiveTarget&dt=t&q=$encoded"
 
-            val request = Request.Builder()
-                .url(url)
-                .header("User-Agent", "Mozilla/5.0")
-                .build()
+                val req = Request.Builder()
+                    .url(url)
+                    .header("User-Agent", "Mozilla/5.0")
+                    .build()
 
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val body = response.body?.string() ?: return@withContext null
-                    val jsonArray = JSONArray(body)
-                    val sentences = jsonArray.getJSONArray(0)
-                    val result = StringBuilder()
-                    for (i in 0 until sentences.length()) {
-                        val part = sentences.getJSONArray(i).getString(0)
-                        result.append(part)
+                client.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string() ?: return@withContext null
+                        val arr = JSONArray(body)
+                        val sentences = arr.getJSONArray(0)
+                        val sb = StringBuilder()
+                        for (i in 0 until sentences.length()) {
+                            sb.append(sentences.getJSONArray(i).getString(0))
+                        }
+                        val translated = sb.toString().trim()
+                        return@withContext if (translated.equals(text.trim(), ignoreCase = true)) null else translated
                     }
-                    val translated = result.toString().trim()
-                    // Don't return translation if it's identical to the original input
-                    return@withContext if (translated.equals(text.trim(), ignoreCase = true)) null else translated
                 }
+            } catch (e: Exception) {
+                Log.w(TAG, "Translation error: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Translation error: ${e.message}")
+            null
         }
-        null
-    }
 
-    /**
-     * Parses standard LRC format strings with [mm:ss.xx] timestamp headers.
-     */
     fun parseLrc(lrcText: String): List<LyricLine> {
         val result = mutableListOf<LyricLine>()
-        val lines = lrcText.lines()
-
-        for (line in lines) {
-            val matcher = LRC_PATTERN.matcher(line.trim())
-            if (matcher.matches()) {
-                val min = matcher.group(1)?.toLongOrNull() ?: 0L
-                val sec = matcher.group(2)?.toLongOrNull() ?: 0L
-                val msPart = matcher.group(3) ?: "0"
+        for (line in lrcText.lines()) {
+            val m = LRC_PATTERN.matcher(line.trim())
+            if (m.matches()) {
+                val min = m.group(1)?.toLongOrNull() ?: 0L
+                val sec = m.group(2)?.toLongOrNull() ?: 0L
+                val msPart = m.group(3) ?: "0"
                 val ms = if (msPart.length == 2) msPart.toLong() * 10 else msPart.toLong()
                 val totalMs = (min * 60 * 1000) + (sec * 1000) + ms
-                val content = matcher.group(4)?.trim() ?: ""
-
+                val content = m.group(4)?.trim() ?: ""
                 if (content.isNotEmpty()) {
                     result.add(LyricLine(timestampMs = totalMs, text = content))
                 }
             }
         }
-
         return result.sortedBy { it.timestampMs }
-    }
-
-    private fun cleanSearchQuery(text: String): String {
-        return text
-            .replace(Regex("""\((feat|ft|remix|official|audio|video|lyrics).*?\)""", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("""\[.*?\]"""), "")
-            .replace(".mp3", "", ignoreCase = true)
-            .replace(".wav", "", ignoreCase = true)
-            .replace(".flac", "", ignoreCase = true)
-            .replace(".m4a", "", ignoreCase = true)
-            .trim()
     }
 }
