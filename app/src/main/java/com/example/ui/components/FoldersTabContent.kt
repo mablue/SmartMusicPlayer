@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -87,9 +89,13 @@ fun FoldersTabContent(
     selectedSongIds: Set<Long> = emptySet(),
     onToggleSelect: (Long) -> Unit = {},
     onLongClick: (Long) -> Unit = {},
+    onSelectAllInFolder: (List<Song>) -> Unit = {},
+    onActiveFolderChanged: (String?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var activeFolder by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(activeFolder) { onActiveFolderChanged(activeFolder) }
 
     val folderGroups = remember(songs) {
         songs.groupBy { it.folderName }
@@ -155,7 +161,11 @@ fun FoldersTabContent(
                     FolderCard(
                         folder = folder,
                         onClick = { activeFolder = folder.name },
-                        onPlayClick = { onPlayFolder(folder.songs) }
+                        onPlayClick = { onPlayFolder(folder.songs) },
+                        onLongClick = {
+                            activeFolder = folder.name
+                            onSelectAllInFolder(folder.songs)
+                        }
                     )
                 }
                 item {
@@ -246,10 +256,12 @@ fun FoldersTabContent(
 }
 
 @Composable
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 private fun FolderCard(
     folder: FolderInfo,
     onClick: () -> Unit,
-    onPlayClick: () -> Unit
+    onPlayClick: () -> Unit,
+    onLongClick: () -> Unit = {}
 ) {
     Card(
         shape = RoundedCornerShape(14.dp),
@@ -257,7 +269,7 @@ private fun FolderCard(
         border = BorderStroke(0.8.dp, DarkSurfaceBorder),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
         Row(
             modifier = Modifier

@@ -1,5 +1,9 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.combinedClickable
+
+import androidx.compose.material3.Checkbox
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -78,6 +82,10 @@ fun PodcastsTabContent(
     onSpeedChange: (Float) -> Unit,
     onSeekRelative: (Long) -> Unit,
     onConvertToMusic: (Song) -> Unit,
+    isSelectionMode: Boolean = false,
+    selectedSongIds: Set<Long> = emptySet(),
+    onToggleSelect: (Long) -> Unit = {},
+    onLongClick: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedCategoryFilter by remember { mutableStateOf<String?>(null) } // null = All, "Podcast", "Audiobook"
@@ -271,6 +279,10 @@ fun PodcastsTabContent(
                         song = item,
                         isCurrent = isCurrent,
                         isPlaying = isPlaying && isCurrent,
+                        isSelectionMode = isSelectionMode,
+                        isSelected = selectedSongIds.contains(item.id),
+                        onToggleSelect = { onToggleSelect(item.id) },
+                        onLongClick = { onLongClick(item.id) },
                         onPlayClick = { onSongClick(item) },
                         onRewind15 = { if (isCurrent) onSeekRelative(-15_000L) },
                         onForward30 = { if (isCurrent) onSeekRelative(30_000L) },
@@ -303,10 +315,15 @@ private fun extractEpisodeOrder(title: String): Long {
 }
 
 @Composable
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 private fun PodcastEpisodeCard(
     song: Song,
     isCurrent: Boolean,
     isPlaying: Boolean,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelect: () -> Unit = {},
+    onLongClick: () -> Unit = {},
     onPlayClick: () -> Unit,
     onRewind15: () -> Unit,
     onForward30: () -> Unit,
@@ -321,21 +338,46 @@ private fun PodcastEpisodeCard(
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isCurrent) DarkSurfaceVariant else DarkSurface
+            containerColor = when {
+                isSelected -> com.example.ui.theme.NeonCyan.copy(alpha = 0.15f)
+                isCurrent -> DarkSurfaceVariant
+                else -> DarkSurface
+            }
         ),
         border = BorderStroke(
-            if (isCurrent) 1.dp else 0.5.dp,
-            if (isCurrent) ElectricBlue else DarkSurfaceBorder.copy(alpha = 0.4f)
+            if (isSelected || isCurrent) 1.dp else 0.5.dp,
+            when {
+                isSelected -> com.example.ui.theme.NeonCyan
+                isCurrent -> ElectricBlue
+                else -> DarkSurfaceBorder.copy(alpha = 0.4f)
+            }
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onPlayClick)
+            .combinedClickable(
+                onClick = { if (isSelectionMode) onToggleSelect() else onPlayClick() },
+                onLongClick = { onLongClick() }
+            )
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                if (isSelectionMode) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { onToggleSelect() },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+                if (isSelectionMode) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { onToggleSelect() },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = ElectricBlue.copy(alpha = 0.2f),

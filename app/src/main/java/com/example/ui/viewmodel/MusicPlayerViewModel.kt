@@ -199,7 +199,11 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun setSelectedTab(tab: AppTab) {
-        _uiState.value = _uiState.value.copy(selectedTab = tab)
+        _uiState.value = _uiState.value.copy(
+            selectedTab = tab,
+            isSelectionMode = false,
+            selectedSongIds = emptySet()
+        )
     }
 
     fun setTierFilter(tier: RankTier?) {

@@ -113,6 +113,9 @@ import com.example.ui.components.LyricsPanel
 import com.example.ui.components.MiniPlayerBar
 import com.example.ui.components.SettingsDialog
 import com.example.ui.components.SongListItem
+import com.example.ui.components.UnifiedContentScreen
+import androidx.compose.material.icons.filled.LayersClear
+import androidx.compose.material.icons.filled.Layers
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceBorder
@@ -164,6 +167,8 @@ fun HomeScreen(
 
     val context = LocalContext.current
     var showGeneralInfoDialog by remember { mutableStateOf(false) }
+    var activeFolderSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var showExperimentalUnified by remember { mutableStateOf(false) }
 
     // Media permission for scanning device audio
     val permissionToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -292,7 +297,7 @@ fun HomeScreen(
                             IconButton(onClick = {
                                 val songsForTab = when (uiState.selectedTab) {
                                     AppTab.LIBRARY -> filteredLibrarySongs
-                                    AppTab.FOLDERS -> allSongs
+                                    AppTab.FOLDERS -> activeFolderSongs.ifEmpty { allSongs }
                                     AppTab.PODCASTS -> podcastAndAudiobooks
                                     AppTab.PLAYLISTS -> emptyList()
                                 }
@@ -424,6 +429,18 @@ fun HomeScreen(
                                 }
                             }
 
+                            // Experimental Unified UI toggle
+                            IconButton(
+                                onClick = { showExperimentalUnified = !showExperimentalUnified },
+                                modifier = Modifier.testTag("experimental_unified_button")
+                            ) {
+                                Icon(
+                                    imageVector = if (showExperimentalUnified) Icons.Default.Layers else Icons.Default.LayersClear,
+                                    contentDescription = "Experimental Unified UI",
+                                    tint = if (showExperimentalUnified) NeonCyan else Color.White.copy(alpha = 0.85f)
+                                )
+                            }
+
                             // Settings Button
                             IconButton(
                                 onClick = { viewModel.setShowSettings(true) },
@@ -531,6 +548,25 @@ fun HomeScreen(
                 }
             }
         ) { innerPadding ->
+            if (showExperimentalUnified) {
+                UnifiedContentScreen(
+                    selectedTab = uiState.selectedTab,
+                    songs = filteredLibrarySongs,
+                    folders = allSongs.groupBy { it.folderName },
+                    podcasts = podcastAndAudiobooks,
+                    favorites = favoriteSongs,
+                    userPlaylists = userPlaylistsState,
+                    currentSong = currentSong,
+                    isPlaying = isPlaying,
+                    onSongClick = { viewModel.playSong(it) },
+                    onFolderClick = { folderName ->
+                        viewModel.setSelectedFolder(folderName)
+                        viewModel.setSelectedTab(AppTab.FOLDERS)
+                        showExperimentalUnified = false
+                    },
+                    onPlaylistClick = { viewModel.playPlaylist(it) }
+                )
+            } else {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -628,6 +664,15 @@ fun HomeScreen(
                                     onLongClick = { id ->
                                         viewModel.toggleSelectionMode(true)
                                         viewModel.toggleSongSelection(id)
+                                    },
+                                    onSelectAllInFolder = { songs ->
+                                        viewModel.toggleSelectionMode(true)
+                                        viewModel.selectAllSongs(songs)
+                                    },
+                                    onActiveFolderChanged = { folderName ->
+                                        activeFolderSongs = if (folderName != null) {
+                                            allSongs.filter { it.folderName == folderName }
+                                        } else emptyList()
                                     }
                                 )
                             }
@@ -645,7 +690,14 @@ fun HomeScreen(
                                     onShareClick = { SongShareHelper.shareSong(context, it) },
                                     onSpeedChange = { viewModel.setPlaybackSpeed(it) },
                                     onSeekRelative = { viewModel.seekRelative(it) },
-                                    onConvertToMusic = { viewModel.setSongCategory(it.id, isPodcast = false) }
+                                    onConvertToMusic = { viewModel.setSongCategory(it.id, isPodcast = false) },
+                                    isSelectionMode = uiState.isSelectionMode,
+                                    selectedSongIds = uiState.selectedSongIds,
+                                    onToggleSelect = { viewModel.toggleSongSelection(it) },
+                                    onLongClick = { id ->
+                                        viewModel.toggleSelectionMode(true)
+                                        viewModel.toggleSongSelection(id)
+                                    }
                                 )
                             }
 
@@ -666,6 +718,8 @@ fun HomeScreen(
             }
         }
     }
+
+            }
 
     // Delete Confirmation Dialog
     uiState.songToDelete?.let { song ->
