@@ -289,7 +289,15 @@ fun HomeScreen(
                         },
                         actions = {
                             // Select All
-                            IconButton(onClick = { viewModel.selectAllSongs(filteredLibrarySongs) }) {
+                            IconButton(onClick = {
+                                val songsForTab = when (uiState.selectedTab) {
+                                    AppTab.LIBRARY -> filteredLibrarySongs
+                                    AppTab.FOLDERS -> allSongs
+                                    AppTab.PODCASTS -> podcastAndAudiobooks
+                                    AppTab.PLAYLISTS -> emptyList()
+                                }
+                                viewModel.selectAllSongs(songsForTab)
+                            }) {
                                 Icon(Icons.Default.SelectAll, contentDescription = "انتخاب همه", tint = NeonCyan)
                             }
 
@@ -613,7 +621,14 @@ fun HomeScreen(
                                     onInfoClick = { viewModel.setInspectingSong(it) },
                                     onDeleteClick = { viewModel.requestDeleteSong(it) },
                                     onEditTagsClick = { viewModel.setEditingSongTags(it) },
-                                    onShareClick = { SongShareHelper.shareSong(context, it) }
+                                    onShareClick = { SongShareHelper.shareSong(context, it) },
+                                    isSelectionMode = uiState.isSelectionMode,
+                                    selectedSongIds = uiState.selectedSongIds,
+                                    onToggleSelect = { viewModel.toggleSongSelection(it) },
+                                    onLongClick = { id ->
+                                        viewModel.toggleSelectionMode(true)
+                                        viewModel.toggleSongSelection(id)
+                                    }
                                 )
                             }
 

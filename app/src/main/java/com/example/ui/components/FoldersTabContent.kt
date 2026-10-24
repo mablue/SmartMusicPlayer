@@ -83,6 +83,10 @@ fun FoldersTabContent(
     onDeleteClick: (Song) -> Unit,
     onEditTagsClick: (Song) -> Unit,
     onShareClick: (Song) -> Unit,
+    isSelectionMode: Boolean = false,
+    selectedSongIds: Set<Long> = emptySet(),
+    onToggleSelect: (Long) -> Unit = {},
+    onLongClick: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var activeFolder by remember { mutableStateOf<String?>(null) }
@@ -198,8 +202,9 @@ fun FoldersTabContent(
                         )
                     )
                 }
-                Button(
-                    onClick = { onPlayFolder(folderSongs) },
+                if (!isSelectionMode) {
+                    Button(
+                        onClick = { onPlayFolder(folderSongs) },
                     colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
@@ -207,6 +212,7 @@ fun FoldersTabContent(
                     Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("پخش همه", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
                 }
             }
 
@@ -224,7 +230,11 @@ fun FoldersTabContent(
                         onInfoClick = { onInfoClick(song) },
                         onDeleteClick = { onDeleteClick(song) },
                         onEditTagsClick = { onEditTagsClick(song) },
-                        onShareClick = { onShareClick(song) }
+                        onShareClick = { onShareClick(song) },
+                        isSelectionMode = isSelectionMode,
+                        isSelected = selectedSongIds.contains(song.id),
+                        onToggleSelect = { onToggleSelect(song.id) },
+                        onLongClick = { onLongClick(song.id) }
                     )
                 }
                 item {
