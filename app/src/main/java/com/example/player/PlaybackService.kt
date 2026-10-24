@@ -1,50 +1,60 @@
 package com.example.player
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.view.KeyEvent
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.MediaStyleNotificationHelper
 import com.example.util.FileLogger
 
+/**
+ * PlaybackService with MANUAL notification management.
+ *
+ * Media3's automatic notification pipeline (onUpdateNotification) does not fire
+ * in our setup (no MediaController connected — we drive exoPlayer directly from
+ * SmartAudioPlayer). Confirmed via verbose logs on Xiaomi 2201123G / Android 15:
+ * onUpdateNotification is never invoked, so no notification is ever built.
+ *
+ * Solution: manage a MediaStyle notification ourselves, driven by a
+ * Player.Listener on the session's player. The session token is set on the
+ * MediaStyle so Android's Now Playing / lock screen integration still works.
+ */
 class PlaybackService : MediaSessionService() {
 
     companion object {
         private const val TAG = "PlaybackService"
         private const val CHANNEL_ID = "smart_music_playback"
+        private const val NOTIF_ID = 1
     }
 
     private var mediaSession: MediaSession? = null
     private var standbyPlayer: ExoPlayer? = null
+    private var playerListener: Player.Listener? = null
 
     override fun onCreate() {
         super.onCreate()
         FileLogger.info(TAG, "onCreate")
-
-        createNotificationChannelIfNeeded()
+        createNotificationChannel()
         logNotificationPermission()
-
-        val provider = DefaultMediaNotificationProvider.Builder(this)
-            .setChannelId(CHANNEL_ID)
-            .build()
-            .apply { setSmallIcon(android.R.drawable.ic_media_play) }
-        setMediaNotificationProvider(provider)
-        FileLogger.info(TAG, "Notification provider configured: icon=ic_media_play, channel=$CHANNEL_ID")
 
         val instance = SmartAudioPlayer.instance
         val player: Player = if (instance != null) {
             FileLogger.info(TAG, "Using SmartAudioPlayer.exoPlayer")
             instance.exoPlayer
         } else {
-            FileLogger.warn(TAG, "SmartAudioPlayer.instance null — standby player")
+            FileLogger.warn(TAG, "SmartAudioPlayer.instance null — standby")
             ExoPlayer.Builder(this).build().also { standbyPlayer = it }
         }
 
@@ -52,11 +62,13 @@ class PlaybackService : MediaSessionService() {
             .setSessionActivity(buildSessionActivity())
             .setCallback(MediaCallback())
             .build()
-        FileLogger.info(TAG, "MediaSession built: playing=${player.isPlaying}, state=${player.playbackState}")
+
+        registerPlayerListener(player)
+        FileLogger.info(TAG, "MediaSession built + listener registered: playing=${player.isPlaying}, state=${player.playbackState}")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        FileLogger.info(TAG, "onStartCommand: action=${intent?.action}, playing=${mediaSession?.player?.isPlaying}, playWhenReady=${mediaSession?.player?.playWhenReady}, state=${mediaSession?.player?.playbackState}, items=${mediaSession?.player?.mediaItemCount}")
+        FileLogger.info(TAG, "onStartCommand: playing=${mediaSession?.player?.isPlaying}, playWhenReady=${mediaSession?.player?.playWhenReady}, state=${mediaSession?.player?.playbackState}, items=${mediaSession?.player?.mediaItemCount}")
 
         val instance = SmartAudioPlayer.instance
         if (instance != null && mediaSession?.player !== instance.exoPlayer) {
@@ -64,33 +76,147 @@ class PlaybackService : MediaSessionService() {
             mediaSession?.release()
             standbyPlayer?.release()
             standbyPlayer = null
+            playerListener?.let { mediaSession?.player?.removeListener(it) }
             mediaSession = MediaSession.Builder(this, instance.exoPlayer)
                 .setSessionActivity(buildSessionActivity())
                 .setCallback(MediaCallback())
                 .build()
-            FileLogger.info(TAG, "Session rebound")
+            registerPlayerListener(instance.exoPlayer)
+            FileLogger.info(TAG, "Session rebound + listener re-registered")
         }
         return super.onStartCommand(intent, flags, startId)
     }
 
     /**
-     * Called by Media3 when the session decides the notification should be shown/updated.
-     * Logging here tells us definitively whether Media3's notification pipeline runs.
+     * Explicitly override to PREVENT Media3 from ever building a notification.
+     * We manage everything ourselves — see class doc.
      */
     override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
-        val p = session.player
-        FileLogger.info(
-            TAG,
-            "onUpdateNotification: startInForeground=$startInForegroundRequired, " +
-            "playWhenReady=${p.playWhenReady}, state=${p.playbackState}, " +
-            "items=${p.mediaItemCount}, isPlaying=${p.isPlaying}"
-        )
-        try {
-            super.onUpdateNotification(session, startInForegroundRequired)
-            FileLogger.info(TAG, "onUpdateNotification: super() OK")
-        } catch (e: Exception) {
-            FileLogger.error(TAG, "onUpdateNotification: super() FAILED", e)
+        FileLogger.info(TAG, "onUpdateNotification IGNORED (using manual notification)")
+    }
+
+    private fun registerPlayerListener(player: Player) {
+        playerListener?.let { runCatching { player.removeListener(it) } }
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                FileLogger.info(TAG, "onIsPlayingChanged: $isPlaying")
+                if (isPlaying) startForegroundNotification() else updateNotification()
+            }
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                FileLogger.info(TAG, "onPlaybackStateChanged: $playbackState")
+                when (playbackState) {
+                    Player.STATE_READY -> updateNotification()
+                    Player.STATE_IDLE -> stopNotification()
+                }
+            }
+            override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+                FileLogger.info(TAG, "onMediaMetadataChanged: ${mediaMetadata.title}")
+                updateNotification()
+            }
         }
+        player.addListener(listener)
+        playerListener = listener
+    }
+
+    private fun startForegroundNotification() {
+        val notif = buildNotification() ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(NOTIF_ID, notif)
+            }
+            FileLogger.info(TAG, "startForeground OK")
+        } catch (e: Exception) {
+            FileLogger.error(TAG, "startForeground FAILED", e)
+        }
+    }
+
+    private fun updateNotification() {
+        val p = mediaSession?.player ?: return
+        if (p.playbackState == Player.STATE_IDLE) return
+        if (p.isPlaying) {
+            startForegroundNotification()
+            return
+        }
+        val notif = buildNotification() ?: return
+        try {
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.notify(NOTIF_ID, notif)
+            FileLogger.info(TAG, "updateNotification OK (paused)")
+        } catch (e: Exception) {
+            FileLogger.error(TAG, "updateNotification FAILED", e)
+        }
+    }
+
+    private fun stopNotification() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            FileLogger.info(TAG, "stopNotification")
+        } catch (e: Exception) {
+            FileLogger.error(TAG, "stopNotification FAILED", e)
+        }
+    }
+
+    private fun buildNotification(): Notification? {
+        val session = mediaSession ?: return null
+        val p = session.player
+        val song = SmartAudioPlayer.instance?.currentSong?.value
+        val title = p.mediaMetadata.title?.toString() ?: song?.title ?: "SmartMusic"
+        val artist = p.mediaMetadata.artist?.toString() ?: song?.artist ?: ""
+
+        val isPlaying = p.isPlaying
+        val playPauseIcon = if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+        val playPauseTitle = if (isPlaying) "Pause" else "Play"
+
+        val playPauseAction = NotificationCompat.Action(
+            playPauseIcon, playPauseTitle, mediaButtonPendingIntent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, 1)
+        )
+        val nextAction = NotificationCompat.Action(
+            android.R.drawable.ic_media_next, "Next", mediaButtonPendingIntent(KeyEvent.KEYCODE_MEDIA_NEXT, 2)
+        )
+        val prevAction = NotificationCompat.Action(
+            android.R.drawable.ic_media_previous, "Previous", mediaButtonPendingIntent(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 3)
+        )
+
+        return try {
+            NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_media_play)
+                .setContentTitle(title)
+                .setContentText(artist)
+                .setContentIntent(buildSessionActivity())
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setOngoing(isPlaying)
+                .setShowWhen(false)
+                .addAction(prevAction)
+                .addAction(playPauseAction)
+                .addAction(nextAction)
+                .setStyle(
+                    MediaStyleNotificationHelper.MediaStyle(session)
+                        .setShowActionsInCompactView(0, 1, 2)
+                )
+                .build()
+        } catch (e: Exception) {
+            FileLogger.error(TAG, "buildNotification FAILED", e)
+            null
+        }
+    }
+
+    private fun mediaButtonPendingIntent(keyCode: Int, reqCode: Int): PendingIntent {
+        val intent = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
+            setPackage(packageName)
+            putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+            putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(KeyEvent.ACTION_UP, keyCode))
+        }
+        return PendingIntent.getBroadcast(
+            this, reqCode, intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -107,6 +233,8 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         FileLogger.info(TAG, "onDestroy")
+        playerListener?.let { runCatching { mediaSession?.player?.removeListener(it) } }
+        playerListener = null
         mediaSession?.let { session ->
             val shared = session.player === SmartAudioPlayer.instance?.exoPlayer
             session.release()
@@ -117,7 +245,7 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
-    private fun createNotificationChannelIfNeeded() {
+    private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = getSystemService(NotificationManager::class.java)
         val existing = nm.getNotificationChannel(CHANNEL_ID)
@@ -127,10 +255,10 @@ class PlaybackService : MediaSessionService() {
             ).apply {
                 description = "Playback controls"
                 setShowBadge(false)
-                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             nm.createNotificationChannel(channel)
-            FileLogger.info(TAG, "NotificationChannel created: $CHANNEL_ID (importance=LOW)")
+            FileLogger.info(TAG, "NotificationChannel created")
         } else {
             FileLogger.info(TAG, "NotificationChannel exists: importance=${existing.importance}")
         }
