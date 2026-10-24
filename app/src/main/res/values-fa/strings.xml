@@ -189,4 +189,7 @@
     <string name="playlists_create_new">ساخت پلی‌لیست جدید</string>
     <string name="playlists_empty_hint">هنوز پلی‌لیستی نساخته‌اید.\nاز منوی هر آهنگ «افزودن به پلی‌لیست» را بزنید.</string>
     <string name="playlists_song_count">%d آهنگ</string>
+    <string name="settings_export_dump_btn">خروجی گرفتن از کتابخانه (JSON)</string>
+    <string name="library_dump_success">%1$d آهنگ در %2$s ذخیره شد</string>
+    <string name="library_dump_failed">خروجی گرفتن شکست خورد</string>
 </resources>

@@ -194,4 +194,7 @@
     <string name="playlists_create_new">Create New Playlist</string>
     <string name="playlists_empty_hint">No playlists yet.\nUse the track menu to add to a playlist.</string>
     <string name="playlists_song_count">%d songs</string>
+    <string name="settings_export_dump_btn">Export Library Dump (JSON)</string>
+    <string name="library_dump_success">Exported %1$d songs to %2$s</string>
+    <string name="library_dump_failed">Export failed (check FileLogger)</string>
 </resources>

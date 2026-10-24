@@ -82,6 +82,7 @@ fun SettingsDialog(
     onSelectTargetLanguage: (String) -> Unit,
     onRescanStorage: () -> Unit,
     onResetScores: () -> Unit,
+    onExportLibraryDump: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var showLangDropdown by remember { mutableStateOf(false) }
@@ -311,6 +312,20 @@ fun SettingsDialog(
                     Icon(Icons.Default.Share, contentDescription = null, tint = NeonAmber, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("ارسال لاگ‌های خطا", color = Color.White, fontSize = 12.sp)
+                }
+
+                // Library Dump (for analysis / lyrics diagnostic)
+                OutlinedButton(
+                    onClick = {
+                        onExportLibraryDump()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.6f))
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.settings_export_dump_btn), color = Color.White, fontSize = 12.sp)
                 }
 
                 // App Info

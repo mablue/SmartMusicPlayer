@@ -611,6 +611,29 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         player.syncLyricLine(lineIndex, timestampMs)
     }
 
+    fun exportLibraryDump(context: android.content.Context, onReady: (java.io.File) -> Unit) {
+        viewModelScope.launch {
+            val songs = allSongs.value
+            val result = com.example.util.LibraryDumpExporter.export(context, songs)
+            if (result != null) {
+                _uiState.value = _uiState.value.copy(
+                    scanResultMsg = getApplication<Application>().getString(
+                        com.example.R.string.library_dump_success,
+                        result.songCount,
+                        result.file.name
+                    )
+                )
+                onReady(result.file)
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    scanResultMsg = getApplication<Application>().getString(
+                        com.example.R.string.library_dump_failed
+                    )
+                )
+            }
+        }
+    }
+
     fun toggleLyricsPanel() {
         val next = !_uiState.value.showLyricsPanel
         _uiState.value = _uiState.value.copy(showLyricsPanel = next)

@@ -779,6 +779,16 @@ fun HomeScreen(
                 viewModel.setShowSettings(false)
                 viewModel.resetAllScores()
             },
+            onExportLibraryDump = {
+                viewModel.exportLibraryDump(context) { file ->
+                    try {
+                        val share = com.example.util.LibraryDumpExporter.shareIntent(context, file)
+                        context.startActivity(android.content.Intent.createChooser(share, "Share library dump"))
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, "Saved to ${file.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
             onDismiss = { viewModel.setShowSettings(false) }
         )
     }
