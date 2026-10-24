@@ -16,7 +16,7 @@ data class SongEntity(
     val isUnplayed: Boolean = true,
     val playCount: Int = 0,
     val skipCount: Int = 0,
-    val score: Float = 50.0f,
+    val score: Float = 0.0f,
     val lastListenRatio: Float = 0.0f,
     val lastPlayedTimestamp: Long = 0L,
     val colorHex: String = "#8B5CF6",

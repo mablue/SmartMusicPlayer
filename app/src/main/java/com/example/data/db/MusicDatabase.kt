@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [SongEntity::class, PlaylistEntity::class], version = 4, exportSchema = true)
+@Database(entities = [SongEntity::class, PlaylistEntity::class], version = 5, exportSchema = true)
 abstract class MusicDatabase : RoomDatabase() {
 
     abstract fun songDao(): SongDao

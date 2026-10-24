@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.smartmusic.pkjv"
     minSdk = 24
     targetSdk = 36
-    versionCode = 34
-    versionName = "1.1.9"
+    versionCode = 35
+    versionName = "1.2.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

@@ -32,7 +32,7 @@ data class Song(
     val isUnplayed: Boolean = true,
     val playCount: Int = 0,
     val skipCount: Int = 0,
-    val score: Float = 50.0f,
+    val score: Float = 0.0f,
     val lastListenRatio: Float = 0.0f,
     val lastPlayedTimestamp: Long = 0L,
     val colorHex: String = "#8B5CF6",
@@ -61,9 +61,9 @@ data class Song(
     val rankTier: RankTier
         get() = when {
             isUnplayed -> RankTier.UNPLAYED
-            score >= 80.0f -> RankTier.DIAMOND
-            score >= 65.0f -> RankTier.GOLD
-            score >= 45.0f -> RankTier.SILVER
+            score >= 60.0f -> RankTier.DIAMOND
+            score >= 30.0f -> RankTier.GOLD
+            score >= 0.0f -> RankTier.SILVER
             else -> RankTier.DISLIKED
         }
 

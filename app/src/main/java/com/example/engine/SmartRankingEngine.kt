@@ -3,7 +3,6 @@ package com.example.engine
 import com.example.data.model.SessionEvaluation
 import com.example.data.model.Song
 import kotlin.math.pow
-import kotlin.random.Random
 
 enum class PlaybackMode(
     @androidx.annotation.StringRes val stringRes: Int,
@@ -21,24 +20,49 @@ enum class PlaybackMode(
         if (isFa) labelFa else labelEn
 }
 
+/**
+ * Continuous fuzzy ranking (v2).
+ *
+ * All songs start at score = 0.0. Each play session adds a continuous Delta
+ * based on how much of the track was listened to (X in [0..1]):
+ *
+ *   ZONE 1 — SEARCH     (X < 0.10):  Delta = -0.1 * X * 100
+ *   ZONE 2 — AVERSION   (0.10..0.5): Delta = -0.5 * (1 - X)^2 * 100
+ *   ZONE 3 — SATISFACTION(X >= 0.5): Delta = +1.0 * (X - 0.5) * 100
+ *
+ * Total = old_score + Delta, clamped to [-100, +100].
+ */
 object SmartRankingEngine {
 
-    const val DEFAULT_UNPLAYED_SCORE = 50.0f
-    const val MIN_SCORE = 5.0f
+    const val SEARCH_WINDOW = 0.10f
+    const val SATISFACTION_THRESHOLD = 0.50f
+
+    const val C_SEARCH = 0.1f
+    const val C_AVERSION = 0.5f
+    const val C_REWARD = 1.0f
+    const val SCALE = 100f
+
+    const val MIN_SCORE = -100.0f
     const val MAX_SCORE = 100.0f
 
-    // Early skip threshold: less than 20 seconds or less than 20% of duration
     const val EARLY_SKIP_MS_THRESHOLD = 20_000L
-    const val EARLY_SKIP_RATIO_THRESHOLD = 0.20f
-    const val FULL_LISTEN_RATIO_THRESHOLD = 0.75f
-
-    // Listening fatigue protection: if a song was played within the last 8 minutes,
-    // skipping it is treated as natural session fatigue/navigation, NOT dislike!
     const val RECENT_PLAY_PROTECTION_THRESHOLD_MS = 8 * 60 * 1000L
 
-    /**
-     * Evaluates user listening session and updates the song's score and statistics.
-     */
+    data class DeltaResult(val delta: Float, val zone: String)
+
+    fun computeDelta(x: Float): DeltaResult {
+        val c = x.coerceIn(0f, 1f)
+        val (delta, zone) = when {
+            c < SEARCH_WINDOW ->
+                -C_SEARCH * c * SCALE to "SEARCH"
+            c < SATISFACTION_THRESHOLD ->
+                -C_AVERSION * (1f - c).pow(2) * SCALE to "AVERSION"
+            else ->
+                C_REWARD * (c - SATISFACTION_THRESHOLD) * SCALE to "SATISFACTION"
+        }
+        return DeltaResult(delta, zone)
+    }
+
     fun evaluateSession(
         song: Song,
         listenedMs: Long,
@@ -47,94 +71,44 @@ object SmartRankingEngine {
         isConsecutiveReplay: Boolean = false
     ): Pair<Song, SessionEvaluation> {
         val safeTotal = if (totalMs > 0) totalMs else song.durationMs.coerceAtLeast(1000L)
-        val ratio = (listenedMs.toFloat() / safeTotal.toFloat()).coerceIn(0f, 1f)
+        val x = (listenedMs.toFloat() / safeTotal).coerceIn(0f, 1f)
         val oldScore = song.score
         val wasUnplayed = song.isUnplayed
 
-        val isEarlySkip = isManualSkip && (listenedMs < EARLY_SKIP_MS_THRESHOLD || ratio < EARLY_SKIP_RATIO_THRESHOLD)
-        val isFullListen = ratio >= FULL_LISTEN_RATIO_THRESHOLD || (!isManualSkip && ratio >= 0.70f)
+        val result = computeDelta(x)
+        val newScore = (oldScore + result.delta).coerceIn(MIN_SCORE, MAX_SCORE)
+        val pct = (x * 100).toInt()
+        val deltaPts = result.delta.toInt()
 
-        // Check if track was played very recently
-        val isRecentlyPlayed = !wasUnplayed && song.lastPlayedTimestamp > 0 &&
-                (System.currentTimeMillis() - song.lastPlayedTimestamp < RECENT_PLAY_PROTECTION_THRESHOLD_MS)
-
-        var newScore: Float
-        var newPlayCount = song.playCount
-        var newSkipCount = song.skipCount
         val reasonFa: String
         val reasonEn: String
-        val isPositive: Boolean
-
-        if (wasUnplayed) {
-            // First time this song is ever played: RESET arbitrary 50.0 placeholder to real behavior!
-            when {
-                isEarlySkip -> {
-                    newScore = 20.0f
-                    newSkipCount++
-                    reasonFa = "اولین پخش: اسکیپ زودهنگام! امتیاز اولیه ۵۰ ریست شد و به عنوان عدم‌علاقه (۲۰) ثبت شد."
-                    reasonEn = "First listen: Early skip! Initial 50 pts reset to 20 (Disliked)."
-                    isPositive = false
-                }
-                isFullListen -> {
-                    newScore = 80.0f
-                    newPlayCount++
-                    reasonFa = "اولین پخش: گوش دادن کامل! امتیاز اولیه ۵۰ ریست شد و رتبه طلایی (۸۰) ثبت گردید."
-                    reasonEn = "First listen: Full play! Initial 50 pts reset to 80 (Gold affinity)."
-                    isPositive = true
-                }
-                else -> {
-                    newScore = 55.0f
-                    reasonFa = "اولین پخش: گوش دادن متوسط (${(ratio * 100).toInt()}%). امتیاز اولیه ریست و ۵۵ ثبت شد."
-                    reasonEn = "First listen: Moderate play. Score reset and set to 55."
-                    isPositive = true
-                }
+        when (result.zone) {
+            "SEARCH" -> {
+                reasonFa = "جستجو ($pct%): احتمالاً دنبال آهنگ دیگری بودید. $deltaPts امتیاز."
+                reasonEn = "Search ($pct%): likely seeking something else. $deltaPts pts."
             }
-        } else {
-            // Song was already played in the past, adjust existing score incrementally
-            when {
-                isEarlySkip && isRecentlyPlayed -> {
-                    // Protected by recency: User recently heard it, skipping is fatigue/navigation, not dislike!
-                    newScore = oldScore
-                    reasonFa = "رد کردن آهنگ تازه شنیده‌شده: کسر امتیاز اعمال نشد (محافظت در برابر خستگی گوش دادن)."
-                    reasonEn = "Skipped recently played track: No penalty applied (fatigue protection)."
-                    isPositive = true
-                }
-                isEarlySkip -> {
-                    val penalty = 20.0f
-                    newScore = (oldScore - penalty).coerceAtLeast(MIN_SCORE)
-                    newSkipCount++
-                    reasonFa = "اسکیپ زودهنگام: کسر ۲۰ امتیاز به دلیل رد سریع آهنگ."
-                    reasonEn = "Early skip: -20 pts penalty."
-                    isPositive = false
-                }
-                isFullListen -> {
-                    val bonus = if (isConsecutiveReplay) 28.0f else 20.0f
-                    newScore = (oldScore + bonus).coerceAtMost(MAX_SCORE)
-                    newPlayCount++
-                    reasonFa = if (isConsecutiveReplay) {
-                        "پخش کامل + تکرار مجدد: ۲۸+ امتیاز پاداش ویژه!"
-                    } else {
-                        "پخش کامل آهنگ: ۲۰+ امتیاز مثبت و افزایش رتبه."
-                    }
-                    reasonEn = if (isConsecutiveReplay) "Full listen + replay: +28 pts bonus!" else "Full play: +20 pts boost!"
-                    isPositive = true
-                }
-                else -> {
-                    val bonus = 5.0f
-                    newScore = (oldScore + bonus).coerceAtMost(MAX_SCORE)
-                    reasonFa = "گوش دادن رضایت‌بخش (${(ratio * 100).toInt()}%): ۵+ امتیاز افزایشی."
-                    reasonEn = "Satisfactory listen: +5 pts boost."
-                    isPositive = true
-                }
+            "AVERSION" -> {
+                reasonFa = "رد سریع ($pct%): هرچه زودتر، جریمه بیشتر. $deltaPts امتیاز."
+                reasonEn = "Aversion ($pct%): earlier skip = heavier penalty. $deltaPts pts."
+            }
+            else -> {
+                reasonFa = if (isConsecutiveReplay)
+                    "پخش کامل + تکرار ($pct%): +$deltaPts پاداش ویژه!"
+                else
+                    "رضایت ($pct%): +$deltaPts امتیاز."
+                reasonEn = if (isConsecutiveReplay)
+                    "Full listen + replay ($pct%): +$deltaPts bonus!"
+                else
+                    "Satisfaction ($pct%): +$deltaPts pts."
             }
         }
 
         val updatedSong = song.copy(
             isUnplayed = false,
             score = newScore,
-            playCount = newPlayCount,
-            skipCount = newSkipCount,
-            lastListenRatio = ratio,
+            playCount = song.playCount + if (x >= 0.75f) 1 else 0,
+            skipCount = song.skipCount + if (isManualSkip && x < 0.20f) 1 else 0,
+            lastListenRatio = x,
             lastPlayedTimestamp = System.currentTimeMillis()
         )
 
@@ -143,20 +117,17 @@ object SmartRankingEngine {
             songTitle = song.title,
             oldScore = oldScore,
             newScore = newScore,
-            scoreDelta = newScore - oldScore,
+            scoreDelta = result.delta,
             reasonFa = reasonFa,
             reasonEn = reasonEn,
-            isPositive = isPositive,
-            listenedRatio = ratio,
+            isPositive = result.delta >= 0f,
+            listenedRatio = x,
             wasUnplayed = wasUnplayed
         )
 
         return Pair(updatedSong, evaluation)
     }
 
-    /**
-     * Selects the next song based on the chosen playback mode.
-     */
     fun selectNextSong(
         playlist: List<Song>,
         currentSongId: Long?,
@@ -166,66 +137,37 @@ object SmartRankingEngine {
         if (playlist.size == 1) return playlist.first()
 
         return when (mode) {
-            PlaybackMode.REPEAT_ONE -> {
+            PlaybackMode.REPEAT_ONE ->
                 playlist.find { it.id == currentSongId } ?: playlist.first()
-            }
             PlaybackMode.SEQUENTIAL -> {
-                val currentIndex = playlist.indexOfFirst { it.id == currentSongId }
-                if (currentIndex >= 0 && currentIndex + 1 < playlist.size) {
-                    playlist[currentIndex + 1]
-                } else {
-                    playlist.first()
-                }
+                val i = playlist.indexOfFirst { it.id == currentSongId }
+                if (i >= 0 && i + 1 < playlist.size) playlist[i + 1] else playlist.first()
             }
             PlaybackMode.RANKED_FIRST -> {
                 val sorted = playlist.sortedByDescending { it.score }
-                val nextCandidates = sorted.filter { it.id != currentSongId }
-                nextCandidates.firstOrNull() ?: sorted.first()
+                sorted.filter { it.id != currentSongId }.firstOrNull() ?: sorted.first()
             }
             PlaybackMode.DISCOVERY -> {
-                // Focus on unplayed tracks first
                 val unplayed = playlist.filter { it.isUnplayed && it.id != currentSongId }
-                if (unplayed.isNotEmpty()) {
-                    unplayed.random()
-                } else {
-                    // Fallback to weighted shuffle if all have been listened to
-                    selectWeightedRandom(playlist, currentSongId)
-                }
+                if (unplayed.isNotEmpty()) unplayed.random()
+                else selectWeightedRandom(playlist, currentSongId)
             }
-            PlaybackMode.SMART_SHUFFLE -> {
-                selectWeightedRandom(playlist, currentSongId)
-            }
+            PlaybackMode.SMART_SHUFFLE -> selectWeightedRandom(playlist, currentSongId)
         }
     }
 
-    /**
-     * Weighted Random Selection:
-     * Higher score = higher probability of selection.
-     * Uses exponent 1.3 to create smooth natural affinity bias.
-     */
     private fun selectWeightedRandom(playlist: List<Song>, currentSongId: Long?): Song {
         val candidates = playlist.filter { it.id != currentSongId }
         val pool = if (candidates.isNotEmpty()) candidates else playlist
-
-        // Compute weights with power curve to amplify favorites without starving exploration
-        val weights = pool.map { song ->
-            val base = song.score.toDouble().coerceAtLeast(MIN_SCORE.toDouble())
-            base.pow(1.3)
+        val weights = pool.map { s ->
+            val shifted = ((s.score - MIN_SCORE) / (MAX_SCORE - MIN_SCORE)).coerceIn(0.05f, 1f)
+            (shifted.toDouble() + 0.5).pow(2.0)
         }
-
-        val totalWeight = weights.sum()
-        if (totalWeight <= 0.0) return pool.random()
-
-        val randomThreshold = Random.nextDouble(0.0, totalWeight)
-        var cumulative = 0.0
-
-        for (i in pool.indices) {
-            cumulative += weights[i]
-            if (cumulative >= randomThreshold) {
-                return pool[i]
-            }
-        }
-
+        val total = weights.sum()
+        if (total <= 0.0) return pool.random()
+        val r = kotlin.random.Random.nextDouble(0.0, total)
+        var acc = 0.0
+        for (i in pool.indices) { acc += weights[i]; if (acc >= r) return pool[i] }
         return pool.last()
     }
 }
