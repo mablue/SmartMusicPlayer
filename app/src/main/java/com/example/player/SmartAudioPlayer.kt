@@ -346,15 +346,10 @@ class SmartAudioPlayer(
         exoPlayer.play()
 
         try {
-            val svcIntent = Intent(context, PlaybackService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(svcIntent)
-                FileLogger.info(TAG, "playSong: startForegroundService OK")
-            } else {
-                context.startService(svcIntent)
-            }
+            context.startService(Intent(context, PlaybackService::class.java))
+            FileLogger.info(TAG, "playSong: startService OK (Media3 will promote to foreground)")
         } catch (e: Exception) {
-            FileLogger.error(TAG, "playSong: startForegroundService FAILED", e)
+            FileLogger.error(TAG, "playSong: startService FAILED", e)
         }
 
         // NOTE: effects attach ONLY from scheduleAudioEffectAttach() (STATE_READY

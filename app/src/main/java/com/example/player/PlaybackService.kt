@@ -15,15 +15,6 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.example.util.FileLogger
 
-/**
- * MediaSessionService with explicit notification setup.
- *
- * Small icon MUST be a monochrome system drawable. Launcher icons (adaptive,
- * coloured) make MIUI and several OEMs silently skip the notification. We use
- * android.R.drawable.ic_media_play which is guaranteed to render everywhere.
- *
- * The channel must exist BEFORE the first notification, or Android 8+ drops it.
- */
 class PlaybackService : MediaSessionService() {
 
     companion object {
@@ -44,11 +35,9 @@ class PlaybackService : MediaSessionService() {
         val provider = DefaultMediaNotificationProvider.Builder(this)
             .setChannelId(CHANNEL_ID)
             .build()
-            .apply {
-                setSmallIcon(android.R.drawable.ic_media_play)
-            }
+            .apply { setSmallIcon(android.R.drawable.ic_media_play) }
         setMediaNotificationProvider(provider)
-        FileLogger.info(TAG, "Notification provider configured")
+        FileLogger.info(TAG, "Notification provider configured: icon=ic_media_play, channel=$CHANNEL_ID")
 
         val instance = SmartAudioPlayer.instance
         val player: Player = if (instance != null) {
@@ -67,7 +56,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        FileLogger.info(TAG, "onStartCommand: action=${intent?.action}, playing=${mediaSession?.player?.isPlaying}, state=${mediaSession?.player?.playbackState}")
+        FileLogger.info(TAG, "onStartCommand: action=${intent?.action}, playing=${mediaSession?.player?.isPlaying}, playWhenReady=${mediaSession?.player?.playWhenReady}, state=${mediaSession?.player?.playbackState}, items=${mediaSession?.player?.mediaItemCount}")
 
         val instance = SmartAudioPlayer.instance
         if (instance != null && mediaSession?.player !== instance.exoPlayer) {
@@ -82,6 +71,26 @@ class PlaybackService : MediaSessionService() {
             FileLogger.info(TAG, "Session rebound")
         }
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    /**
+     * Called by Media3 when the session decides the notification should be shown/updated.
+     * Logging here tells us definitively whether Media3's notification pipeline runs.
+     */
+    override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
+        val p = session.player
+        FileLogger.info(
+            TAG,
+            "onUpdateNotification: startInForeground=$startInForegroundRequired, " +
+            "playWhenReady=${p.playWhenReady}, state=${p.playbackState}, " +
+            "items=${p.mediaItemCount}, isPlaying=${p.isPlaying}"
+        )
+        try {
+            super.onUpdateNotification(session, startInForegroundRequired)
+            FileLogger.info(TAG, "onUpdateNotification: super() OK")
+        } catch (e: Exception) {
+            FileLogger.error(TAG, "onUpdateNotification: super() FAILED", e)
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -121,7 +130,7 @@ class PlaybackService : MediaSessionService() {
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             }
             nm.createNotificationChannel(channel)
-            FileLogger.info(TAG, "NotificationChannel created: $CHANNEL_ID")
+            FileLogger.info(TAG, "NotificationChannel created: $CHANNEL_ID (importance=LOW)")
         } else {
             FileLogger.info(TAG, "NotificationChannel exists: importance=${existing.importance}")
         }
@@ -133,8 +142,6 @@ class PlaybackService : MediaSessionService() {
                 this, android.Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
             FileLogger.info(TAG, "POST_NOTIFICATIONS granted=$granted")
-        } else {
-            FileLogger.info(TAG, "POST_NOTIFICATIONS not needed pre-API-33")
         }
     }
 
