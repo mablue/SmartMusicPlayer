@@ -371,13 +371,8 @@ private fun PodcastEpisodeCard(
                         modifier = Modifier.padding(end = 8.dp)
                     )
                 }
-                if (isSelectionMode) {
-                    Checkbox(
-                        checked = isSelected,
-                        onCheckedChange = { onToggleSelect() },
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                }
+
+
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = ElectricBlue.copy(alpha = 0.2f),
