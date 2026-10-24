@@ -330,20 +330,27 @@ class SmartAudioPlayer(
 
         fetchLyricsForSong(song)
 
-        val mediaItem = MediaItem.Builder()
-            .setMediaId(song.id.toString())
-            .setUri(playableUri)
-            .setMediaMetadata(
-                androidx.media3.common.MediaMetadata.Builder()
-                    .setTitle(song.title)
-                    .setArtist(song.artist)
-                    .build()
-            )
-            .build()
+        // STANDARD FIX: build the FULL queue so the notification gets Next/Prev
+        // buttons and stays in sync with the app's playlist.
+        val playlistForPlayer = currentPlaylist.ifEmpty { listOf(song) }
+        val mediaItems = playlistForPlayer.map { s ->
+            val uri = if (s.uri.isNotEmpty()) s.uri else getFallbackUri(s)
+            MediaItem.Builder()
+                .setMediaId(s.id.toString())
+                .setUri(uri)
+                .setMediaMetadata(
+                    androidx.media3.common.MediaMetadata.Builder()
+                        .setTitle(s.title)
+                        .setArtist(s.artist)
+                        .build()
+                )
+                .build()
+        }
+        val startIndex = playlistForPlayer.indexOfFirst { it.id == song.id }
+            .takeIf { it >= 0 } ?: 0
 
-        exoPlayer.setMediaItem(mediaItem)
+        exoPlayer.setMediaItems(mediaItems, startIndex, targetStart)
         exoPlayer.prepare()
-        exoPlayer.seekTo(targetStart)
         exoPlayer.play()
 
         try {
@@ -467,6 +474,12 @@ class SmartAudioPlayer(
         if (next != null) {
             FileLogger.info(TAG, "skipNext -> from playlist: ${next.title}")
             playSong(next)
+            // Issue #1940 workaround: after playSong already set setMediaItems,
+            // re-apply the same list to force notification refresh.
+            runCatching {
+                val idx = currentPlaylist.indexOfFirst { it.id == next.id }
+                if (idx >= 0) exoPlayer.seekToDefaultPosition(idx)
+            }
         }
     }
 
