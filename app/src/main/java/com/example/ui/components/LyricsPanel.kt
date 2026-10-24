@@ -21,18 +21,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -41,13 +40,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -64,13 +64,12 @@ import com.example.ui.theme.NeonViolet
 import kotlinx.coroutines.delay
 
 /**
- * 全屏歌词面板 — Apple Music 风格
+ * Full-screen lyrics panel.
  *
- * - 活跃行居中、放大、全亮
- * - 相邻行透明度 0.55，隔两行 0.35，再远加模糊
- * - 翻译行在主行下方，0.6× 字号
- * - 手动滚动后 5 秒恢复自动滚动
- * - 顶部工具栏：自动搜索 / 自动翻译开关 + 关闭
+ * Supports two modes:
+ *  - Auto-scroll for synced lyrics (LRC with timestamps)
+ *  - Manual sync for plain lyrics: user scrolls, center line is highlighted,
+ *    "Sync" FAB appears, tapping it pins current position to that line.
  */
 @Composable
 fun LyricsPanel(
@@ -86,20 +85,35 @@ fun LyricsPanel(
     onToggleAutoTranslate: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onRetryFetch: () -> Unit,
+    onSyncLine: (index: Int, timestampMs: Long) -> Unit = { _, _ -> },
     onDismiss: () -> Unit
 ) {
     var userScrollCooldown by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
     val isDragging by listState.interactionSource.collectIsDraggedAsState()
 
+    var manualScrollActive by remember { mutableStateOf(false) }
+    var lastDragStopTime by remember { mutableStateOf(0L) }
+
+    LaunchedEffect(isDragging) {
+        if (isDragging) {
+            manualScrollActive = true
+            lastDragStopTime = 0L
+        } else if (manualScrollActive) {
+            lastDragStopTime = System.currentTimeMillis()
+            delay(10_000L)
+            if (lastDragStopTime > 0L &&
+                System.currentTimeMillis() - lastDragStopTime >= 9_500L
+            ) {
+                manualScrollActive = false
+            }
+        }
+    }
+
     val lines = lyricsResult?.lines ?: emptyList()
     val activeIndex = remember(currentPositionMs, lines) {
         val idx = lines.indexOfLast { it.timestampMs <= currentPositionMs }
         if (idx >= 0) idx else 0
-    }
-
-    LaunchedEffect(isDragging) {
-        if (isDragging) userScrollCooldown = 5
     }
 
     LaunchedEffect(activeIndex, userScrollCooldown, isDragging) {
@@ -110,10 +124,25 @@ fun LyricsPanel(
         }
     }
 
+    LaunchedEffect(isDragging) {
+        if (isDragging) userScrollCooldown = 5
+    }
+
     LaunchedEffect(userScrollCooldown) {
         if (userScrollCooldown > 0) {
             delay(1000L)
             userScrollCooldown -= 1
+        }
+    }
+
+    val centerItemIndex by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            if (info.visibleItemsInfo.isEmpty()) return@derivedStateOf null
+            val vCenter = (info.viewportStartOffset + info.viewportEndOffset) / 2
+            info.visibleItemsInfo.minByOrNull {
+                kotlin.math.abs((it.offset + it.size / 2) - vCenter)
+            }?.index
         }
     }
 
@@ -134,7 +163,6 @@ fun LyricsPanel(
             )
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // ─── 顶部工具栏 ───
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -175,7 +203,6 @@ fun LyricsPanel(
                 }
             }
 
-            // ─── 歌曲信息 ───
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -200,7 +227,6 @@ fun LyricsPanel(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ─── 歌词主体 ───
             when {
                 isLoading -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -212,7 +238,9 @@ fun LyricsPanel(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = if (autoSearchLyrics) "در حال جستجو…" else "متنی یافت نشد",
-                                style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.7f))
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    color = Color.White.copy(alpha = 0.7f)
+                                )
                             )
                             if (autoSearchLyrics) {
                                 Spacer(Modifier.height(16.dp))
@@ -251,6 +279,7 @@ fun LyricsPanel(
                                 line = line,
                                 isActive = idx == activeIndex,
                                 distance = distance,
+                                isCenter = (idx == centerItemIndex) && manualScrollActive,
                                 onClick = {
                                     if (lyricsResult.isSynced) onSeekTo(line.timestampMs)
                                 }
@@ -260,29 +289,52 @@ fun LyricsPanel(
                 }
             }
         }
+
+        // Sync FAB — only for plain (unsynced) lyrics when the user has scrolled
+        if (manualScrollActive &&
+            lyricsResult != null &&
+            !lyricsResult.isSynced &&
+            lines.isNotEmpty()
+        ) {
+            FloatingActionButton(
+                onClick = {
+                    val ci = centerItemIndex
+                    if (ci != null && ci in lines.indices) {
+                        onSyncLine(ci, currentPositionMs)
+                        manualScrollActive = false
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 24.dp),
+                containerColor = NeonCyan,
+                contentColor = Color.Black
+            ) {
+                Icon(Icons.Default.Sync, contentDescription = "Sync this line")
+            }
+        }
     }
 }
 
-// ─────────────────────────────────────────────────────────
-// 单行歌词 — 核心视觉逻辑
-// ─────────────────────────────────────────────────────────
 @Composable
 private fun LyricRow(
     line: LyricLine,
     isActive: Boolean,
     distance: Int,
+    isCenter: Boolean = false,
     onClick: () -> Unit
 ) {
-    // 目标状态基于距离
-    val targetAlpha = when (distance) {
-        0 -> 1.0f
-        1 -> 0.55f
-        2 -> 0.35f
+    val targetAlpha = when {
+        isCenter -> 1.0f
+        distance == 0 -> 1.0f
+        distance == 1 -> 0.55f
+        distance == 2 -> 0.35f
         else -> 0.18f
     }
-    val targetScale = when (distance) {
-        0 -> 1.0f
-        1 -> 0.88f
+    val targetScale = when {
+        isCenter -> 1.06f
+        distance == 0 -> 1.0f
+        distance == 1 -> 0.88f
         else -> 0.80f
     }
     val alpha by animateFloatAsState(
@@ -299,7 +351,7 @@ private fun LyricRow(
         label = "lyricScale"
     )
     val textColor by animateColorAsState(
-        targetValue = if (isActive) Color.White else Color(0xFFCBD5E1),
+        targetValue = if (isActive || isCenter) Color.White else Color(0xFFCBD5E1),
         animationSpec = tween(300),
         label = "lyricColor"
     )
@@ -334,7 +386,6 @@ private fun LyricRow(
             )
         )
 
-        // 翻译行（如果开启且有内容）
         line.translatedText?.takeIf { it.isNotBlank() }?.let { translated ->
             Spacer(Modifier.height(6.dp))
             Text(
@@ -351,9 +402,6 @@ private fun LyricRow(
     }
 }
 
-// ─────────────────────────────────────────────────────────
-// 顶部工具栏的 toggle 图标
-// ─────────────────────────────────────────────────────────
 @Composable
 private fun LyricsToggleIcon(
     icon: androidx.compose.ui.graphics.vector.ImageVector,

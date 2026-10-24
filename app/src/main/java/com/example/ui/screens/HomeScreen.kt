@@ -731,6 +731,7 @@ fun HomeScreen(
             onToggleAutoTranslate = { viewModel.toggleAutoTranslateLyrics() },
             onSeekTo = { viewModel.seekTo(it) },
             onRetryFetch = { viewModel.fetchLyricsForCurrent() },
+            onSyncLine = { idx, ts -> viewModel.syncLyricLine(idx, ts) },
             onDismiss = { viewModel.toggleLyricsPanel() }
         )
     }

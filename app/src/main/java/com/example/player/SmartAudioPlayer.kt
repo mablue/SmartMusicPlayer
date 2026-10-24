@@ -703,6 +703,31 @@ class SmartAudioPlayer(
         }
     }
 
+    fun syncLyricLine(lineIndex: Int, timestampMs: Long) {
+        val current = _lyricsResult.value ?: return
+        if (lineIndex !in current.lines.indices) return
+
+        val updated = current.lines.toMutableList()
+        updated[lineIndex] = updated[lineIndex].copy(timestampMs = timestampMs)
+        val sorted = updated.sortedBy { it.timestampMs }
+
+        _lyricsResult.value = current.copy(lines = sorted, isSynced = true)
+
+        val songId = _currentSong.value?.id ?: return
+        val plain = sorted.joinToString("\n") { it.text }
+        val synced = sorted.joinToString("\n") { line ->
+            val ms = line.timestampMs
+            val min = ms / 60000
+            val sec = (ms % 60000) / 1000
+            val centis = (ms % 1000) / 10
+            "[%02d:%02d.%02d] %s".format(min, sec, centis, line.text)
+        }
+        coroutineScope.launch(Dispatchers.IO) {
+            repository.cacheLyrics(songId, plain, synced, "")
+            FileLogger.info(TAG, "syncLyricLine: idx=$lineIndex ts=$timestampMs songId=$songId")
+        }
+    }
+
     fun release() {
         lyricsJob?.cancel()
         translateJob?.cancel()

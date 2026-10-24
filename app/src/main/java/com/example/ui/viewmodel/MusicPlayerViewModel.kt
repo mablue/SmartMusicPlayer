@@ -607,6 +607,10 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         _uiState.value = _uiState.value.copy(autoTranslateLyrics = next, isLyricsTranslation = next)
     }
 
+    fun syncLyricLine(lineIndex: Int, timestampMs: Long) {
+        player.syncLyricLine(lineIndex, timestampMs)
+    }
+
     fun toggleLyricsPanel() {
         val next = !_uiState.value.showLyricsPanel
         _uiState.value = _uiState.value.copy(showLyricsPanel = next)
